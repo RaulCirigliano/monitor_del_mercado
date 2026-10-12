@@ -99,3 +99,39 @@ def test_keyword_extraction_and_custom_directive():
         content = report_file.read_text(encoding="utf-8")
         assert "Recomendaciones de Maslatón" in content
 
+
+def test_guia_operador_and_parsing():
+    from src.models import GuiaOperador
+    from src.dashboard.report_parser import parse_markdown_report
+
+    guia = GuiaOperador(
+        estado_semaforo="OPERAR CON CAUTELA",
+        mensaje_principal="Oportunidad detectada en TLT por capitulación de bonos.",
+        checklist_pasos=[
+            "1. LOCALIZA EL ACTIVO: Busca 'TLT' en tu plataforma.",
+            "2. ORDEN DE COMPRA: Configura una orden límite en 78.00 USD.",
+            "3. STOP LOSS OBLIGATORIO: Coloca tu orden defensiva en 74.00 USD.",
+        ],
+        regla_gestion_riesgo="REGLA DEL 1%: Nunca arriesgues más del 1% del total de tu cuenta.",
+        consejo_psicologico="Mantén la calma y no operes por impulso.",
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        gen = MarkdownReportGenerator(output_dir=Path(tmpdir))
+        batch = AnalysisBatch(
+            timestamp="2026-10-12 19:00:00",
+            total_noticias_analizadas=10,
+            total_ruido_descartado=8,
+            oportunidades=[],
+            alertas_peligro=[],
+            guia_operador=guia,
+        )
+        report_file = gen.generate_report(batch)
+        assert report_file.exists()
+
+        parsed = parse_markdown_report(report_file)
+        assert "guia_operador" in parsed
+        assert parsed["guia_operador"]["estado_semaforo"] == "OPERAR CON CAUTELA"
+        assert len(parsed["guia_operador"]["checklist_pasos"]) >= 1
+
+

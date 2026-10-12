@@ -103,10 +103,32 @@ class MarkdownReportGenerator:
         else:
             md_content += "_No se identificaron trampas extremas de euforia activa en las fuentes escaneadas._\n\n---\n"
 
+        # 3. Hoja de Ruta del Operador Novato
+        if batch.guia_operador:
+            guia = batch.guia_operador
+            pasos_md = "\n".join(f"* {p}" for p in guia.checklist_pasos)
+            md_content += f"""
+## 🧭 3. Hoja de Ruta del Operador (Plan de Acción Paso a Paso para Principiantes)
+> **Semáforo de Decisión:** `{guia.estado_semaforo}`  
+> **Instrucción Operativa:** {guia.mensaje_principal}
+
+### 📋 Checklist Operativo en Español Llano:
+{pasos_md}
+
+### 🛡️ Regla de Supervivencia (Gestión de Riesgo):
+> {guia.regla_gestion_riesgo}
+
+### 🧠 Traductor Psicológico de Noticias (Mente Contrarian):
+> {guia.consejo_psicologico}
+
+---
+"""
+
         md_content += """
 ## 📜 Principio de Independencia
 > **Aviso:** Monitor del Mercado es un sistema de investigación e inteligencia computacional pura. No ejecuta órdenes de compra/venta ni constituye asesoramiento financiero. Toda decisión de inversión requiere gestión de riesgo personal.
 """
+
 
         with open(report_path, "w", encoding="utf-8") as f:
             f.write(md_content)

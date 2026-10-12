@@ -77,6 +77,28 @@ class TerminalViewer:
         console.print(Panel(content, title=f"{icon} [bold]{card.tipo}: {card.ticker}[/bold]", border_style=border))
 
     @staticmethod
+    def show_operator_guide(batch: AnalysisBatch):
+        """Muestra la hoja de ruta práctica para el operador en terminal."""
+        if not batch.guia_operador:
+            return
+
+        guia = batch.guia_operador
+        color = "green" if "OPERAR" in guia.estado_semaforo else ("red" if "PELIGRO" in guia.estado_semaforo else "yellow")
+        pasos_str = "\n".join(f"  [cyan]✔[/cyan] {p}" for p in guia.checklist_pasos)
+
+        content = f"""[bold]Semáforo:[/bold] [{color}]{guia.estado_semaforo}[/{color}]
+[bold]Instrucción:[/bold] {guia.mensaje_principal}
+
+[bold underline]Checklist Paso a Paso:[/bold underline]
+{pasos_str}
+
+[bold green]🛡️ Gestión de Riesgo:[/bold green] {guia.regla_gestion_riesgo}
+[bold magenta]🧠 Mente Contrarian:[/bold magenta] {guia.consejo_psicologico}"""
+
+        console.print(Panel(content, title="🧭 [bold]HOJA DE RUTA DEL OPERADOR (GUÍA PARA NOVATOS)[/bold]", border_style=color))
+
+    @staticmethod
     def show_report_saved(path: Path):
         """Informa sobre el archivo de reporte generado."""
         console.print(f"[bold green]✔ Reporte guardado con éxito en:[/bold green] [underline]{path}[/underline]\n")
+

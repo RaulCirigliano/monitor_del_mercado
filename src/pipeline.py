@@ -93,6 +93,8 @@ class MarketMonitorPipeline:
             for card in batch.alertas_peligro:
                 TerminalViewer.show_card(card)
 
+        TerminalViewer.show_operator_guide(batch)
         TerminalViewer.show_report_saved(report_path)
 
         return batch
+

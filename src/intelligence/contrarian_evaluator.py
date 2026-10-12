@@ -3,7 +3,14 @@ from typing import Dict, List, Optional, Any
 import logging
 
 from config import settings
-from src.models import NewsItem, AssetSnapshot, OpportunityCard, AnalysisBatch
+from src.models import (
+    NewsItem,
+    AssetSnapshot,
+    OpportunityCard,
+    AnalysisBatch,
+    GuiaOperador,
+)
+
 from src.intelligence.ollama_client import OllamaClient
 from src.intelligence.gemini_client import GeminiClient
 from src.intelligence.prompts import (
@@ -208,6 +215,11 @@ class ContrarianEvaluator:
 
         total_ruido = max(0, min(len(news_items), len(news_items) - len(valid_opportunities) - len(valid_dangers)))
 
+        # FASE 4: Hoja de Ruta Práctica para el Operador Novato
+        guia_operador = self._build_operator_guide(
+            valid_opportunities, valid_dangers, custom_directive=custom_directive
+        )
+
         return AnalysisBatch(
             timestamp=now_str,
             total_noticias_analizadas=len(news_items),
@@ -217,5 +229,69 @@ class ContrarianEvaluator:
             conclusiones_internas=conclusiones_internas,
             sintesis_ejecutiva=sintesis,
             directiva_personalizada=custom_directive,
+            guia_operador=guia_operador,
         )
+
+    def _build_operator_guide(
+        self,
+        opportunities: List[OpportunityCard],
+        dangers: List[OpportunityCard],
+        custom_directive: Optional[str] = None,
+    ) -> GuiaOperador:
+        """Construye una hoja de ruta con instrucciones paso a paso en lenguaje 100% accesible para un operador novato."""
+        if opportunities:
+            opp = opportunities[0]
+            ticker = opp.ticker
+            entry = opp.nivel_entrada_sugerido
+            stop = opp.stop_loss_sugerido or "5% por debajo del precio de entrada"
+            target = opp.target_proyectado or "15% a 20% por encima de la entrada"
+
+            pasos = [
+                f"1. LOCALIZA EL ACTIVO: Abre tu plataforma de inversión y busca el ticker '{ticker}' ({opp.asset_name}).",
+                f"2. ORDEN DE COMPRA (NO COMPRES A CUALQUIER PRECIO): Configura una 'orden límite' en la zona de {entry}. No compres a mercado apresuradamente; espera que el precio venga a ti.",
+                f"3. PROTEGE TU CAPITAL (STOP LOSS OBLIGATORIO): En el mismo instante que se ejecute la compra, coloca tu orden de venta defensiva (Stop Loss) en {stop}. Este es tu cinturón de seguridad: si el precio cae a ese punto, se vende automáticamente para que tu pérdida sea pequeña y controlada.",
+                f"4. PLANIFICA TU GANANCIA (TAKE PROFIT): Programa una orden de toma de ganancias en {target}. Si el precio alcanza ese objetivo, retira beneficios sin codicia.",
+                f"5. MONITOREA SIN ANSIEDAD: El horizonte estimado es de {opp.horizonte_temporal}. No mires el gráfico cada 5 minutos; dale tiempo a la tesis para desarrollarse.",
+            ]
+
+            return GuiaOperador(
+                estado_semaforo="OPERAR CON CAUTELA",
+                mensaje_principal=f"Existe una oportunidad de inversión asimétrica favorable en {ticker}. La multitud está asustada y vendiendo, lo que te permite comprar a un precio castigado arriesgando poco para ganar el triple.",
+                checklist_pasos=pasos,
+                regla_gestion_riesgo="REGLA DEL 1%: Nunca arriesgues más del 1% o 2% de todo el dinero de tu cuenta en esta operación. Por ejemplo, si tienes 1.000 USD, tu pérdida máxima permitida en el Stop Loss no debe superar los 10 a 20 USD.",
+                consejo_psicologico="Si ves titulares en los diarios diciendo que todo se va a derrumbar respecto a este activo, mantén la calma. El pánico de los medios es el causante del descuento. Tu ventaja como inversor contrarian es comprar cuando hay sangre y vender cuando hay fiesta.",
+            )
+
+        elif dangers:
+            danger = dangers[0]
+            ticker = danger.ticker
+            pasos = [
+                f"1. ALTO TOTAL: No compres '{ticker}' ({danger.asset_name}) bajo ninguna circunstancia.",
+                "2. NO TE DEJES LLEVAR POR EL FOMO (Miedo a Quedar Fuera): Aunque todos en redes sociales o noticias digan que va a subir sin parar, el precio ya está inflado.",
+                "3. SI YA TIENES ESTE ACTIVO: Considera vender una parte para asegurar ganancias o ajustar un Stop Loss ceñido.",
+                "4. CONSERVA TU LIQUIDEZ: Tu dinero está más seguro en tu cuenta esperando una verdadera caída que arriesgándolo en un techo.",
+            ]
+            return GuiaOperador(
+                estado_semaforo="ALERTA DE PELIGRO",
+                mensaje_principal=f"El activo {ticker} está en zona de euforia mediática peligrosa. Los inversores novatos están entrando por codicia y los grandes fondos los utilizarán como liquidez para venderles caro.",
+                checklist_pasos=pasos,
+                regla_gestion_riesgo="PRESERVACIÓN DE CAPITAL: El primer objetivo de un operador novato no es hacerse rico rápido, sino evitar perder el dinero en las trampas de euforia.",
+                consejo_psicologico="Sentirás ganas de comprar porque 'todo el mundo habla de ello'. Esa es la trampa psicológica más antigua del mercado. Recuerda: compra en el pánico, huye de la euforia.",
+            )
+
+        else:
+            pasos = [
+                "1. QUÉDATE QUIETO: Hoy no toques ningún botón de compra ni de venta.",
+                "2. CONSERVA EL 100% DE TU DINERO EN EFECTIVO: El 95% de las noticias de hoy fueron descartadas como ruido publicitario o chismes sin fundamento.",
+                "3. EVITA EL ERROR N° 1 DEL NOVATO: El error más común es operar todos los días por aburrimiento o impaciencia. Los traders profesionales pasan el 80% de su tiempo observando y esperando.",
+                "4. ESPERA AL PRÓXIMO ESCANEO: Mantén el radar activo y espera a que el mercado ofrezca una verdadera capitulación con ventaja matemática.",
+            ]
+            return GuiaOperador(
+                estado_semaforo="ESPERAR / NO OPERAR",
+                mensaje_principal="El mercado no ofrece ninguna oportunidad asimétrica clara hoy. Todo el flujo analizado es ruido mediático transitorio. La decisión más inteligente y rentable hoy es NO OPERAR.",
+                checklist_pasos=pasos,
+                regla_gestion_riesgo="PACIENCIA Y DISCIPLINA: No perder dinero en días de ruido es exactamente igual a ganar dinero. El efectivo es una posición ganadora.",
+                consejo_psicologico="No sientas que estás perdiendo el tiempo por no hacer una operación hoy. La disciplina de esperar a que el precio y el pánico jueguen a tu favor es lo que separa a los perdedores de los inversores exitosos.",
+            )
+
 

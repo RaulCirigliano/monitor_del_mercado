@@ -156,7 +156,44 @@ function renderReport(report) {
       dangerContainer.appendChild(createDangerCard(card));
     });
   }
+
+  // 4. Hoja de Ruta del Operador Novato
+  const guia = report.guia_operador;
+  const semBadge = document.getElementById('operator-semaphore-badge');
+  const semText = document.getElementById('operator-semaphore-text');
+  const mainMsg = document.getElementById('operator-main-message');
+  const checkList = document.getElementById('operator-checklist');
+  const riskRule = document.getElementById('operator-risk-rule');
+  const psychoAdv = document.getElementById('operator-psycho-advice');
+
+  if (guia) {
+    if (semText) semText.innerText = guia.estado_semaforo;
+    if (semBadge) {
+      if (guia.estado_semaforo.includes('OPERAR CON')) {
+        semBadge.className = 'text-xs px-3 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 font-mono font-bold flex items-center gap-1.5';
+      } else if (guia.estado_semaforo.includes('PELIGRO')) {
+        semBadge.className = 'text-xs px-3 py-1 rounded-full bg-red-950 text-red-300 border border-red-800 font-mono font-bold flex items-center gap-1.5';
+      } else {
+        semBadge.className = 'text-xs px-3 py-1 rounded-full bg-amber-950 text-amber-300 border border-amber-800 font-mono font-bold flex items-center gap-1.5';
+      }
+    }
+    if (mainMsg) mainMsg.innerText = guia.mensaje_principal;
+    if (checkList) {
+      checkList.innerHTML = '';
+      if (guia.checklist_pasos && guia.checklist_pasos.length > 0) {
+        guia.checklist_pasos.forEach(paso => {
+          const item = document.createElement('div');
+          item.className = 'p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs flex items-start gap-2';
+          item.innerHTML = `<span class="text-cyan-400 font-bold shrink-0">✔</span> <span>${escapeHtml(paso)}</span>`;
+          checkList.appendChild(item);
+        });
+      }
+    }
+    if (riskRule) riskRule.innerText = guia.regla_gestion_riesgo;
+    if (psychoAdv) psychoAdv.innerText = guia.consejo_psicologico;
+  }
 }
+
 
 function createOpportunityCard(card) {
   const div = document.createElement('div');

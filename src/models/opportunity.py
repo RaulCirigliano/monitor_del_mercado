@@ -79,3 +79,29 @@ class AnalysisBatch(BaseModel):
         default=None,
         description="Directiva o enfoque temático solicitado por el usuario"
     )
+    guia_operador: Optional["GuiaOperador"] = Field(
+        default=None,
+        description="Plan de acción paso a paso para el operador novato"
+    )
+
+
+class GuiaOperador(BaseModel):
+    """Plan de acción práctico y directo para el operador humano novato."""
+
+    estado_semaforo: Literal["OPERAR CON CAUTELA", "ESPERAR / NO OPERAR", "ALERTA DE PELIGRO"] = Field(
+        description="Semáforo de acción directa"
+    )
+    mensaje_principal: str = Field(
+        description="Instrucción en lenguaje cotidiano sin tecnicismos"
+    )
+    checklist_pasos: List[str] = Field(
+        default_factory=list,
+        description="Pasos concretos que debe ejecutar el operador"
+    )
+    regla_gestion_riesgo: str = Field(
+        description="Regla de oro de supervivencia de capital para novatos"
+    )
+    consejo_psicologico: str = Field(
+        description="Traducción psicológica de las noticias para no dejarse llevar por el miedo o FOMO"
+    )
+

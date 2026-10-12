@@ -95,4 +95,63 @@ def parse_markdown_report(report_path: Path) -> Dict[str, Any]:
 
         result["oportunidades"].append(card)
 
+    # Extraer Hoja de Ruta del Operador
+    m_semaforo = re.search(r"> \*\*Semáforo de Decisión:\*\*\s*`([^`]+)`", text)
+    if m_semaforo:
+        guia = {
+            "estado_semaforo": m_semaforo.group(1).strip(),
+            "mensaje_principal": "",
+            "checklist_pasos": [],
+            "regla_gestion_riesgo": "",
+            "consejo_psicologico": "",
+        }
+        m_inst = re.search(r"> \*\*Instrucción Operativa:\*\*\s*(.+)", text)
+        if m_inst:
+            guia["mensaje_principal"] = m_inst.group(1).strip()
+
+        # Extraer pasos del checklist
+        m_pasos = re.findall(r"\*\s*(\d+\..+)", text)
+        guia["checklist_pasos"] = [p.strip() for p in m_pasos]
+
+        # Extraer regla de riesgo
+        m_riesgo = re.search(r"### 🛡️ Regla de Supervivencia \(Gestión de Riesgo\):\n>\s*([^\n]+)", text)
+        if m_riesgo:
+            guia["regla_gestion_riesgo"] = m_riesgo.group(1).strip()
+
+        # Extraer consejo psicológico
+        m_psico = re.search(r"### 🧠 Traductor Psicológico de Noticias \(Mente Contrarian\):\n>\s*([^\n]+)", text)
+        if m_psico:
+            guia["consejo_psicologico"] = m_psico.group(1).strip()
+
+        result["guia_operador"] = guia
+    else:
+        # Retrocompatibilidad con reportes anteriores
+        if result["oportunidades"]:
+            opp0 = result["oportunidades"][0]
+            result["guia_operador"] = {
+                "estado_semaforo": "OPERAR CON CAUTELA",
+                "mensaje_principal": f"Existe una oportunidad asimétrica detectada en {opp0.get('ticker')}. Sigue el plan de entrada con orden límite.",
+                "checklist_pasos": [
+                    f"1. LOCALIZA EL ACTIVO: Busca '{opp0.get('ticker')}' en tu plataforma de trading o broker.",
+                    f"2. ORDEN LÍMITE: Coloca tu orden de compra en {opp0.get('nivel_entrada_sugerido')}.",
+                    f"3. STOP LOSS OBLIGATORIO: Pon tu límite de pérdida en {opp0.get('stop_loss_sugerido') or 'zona defensiva'}.",
+                    f"4. TAKE PROFIT: Fija tu salida de beneficios en {opp0.get('target_proyectado') or 'zona de target'}.",
+                ],
+                "regla_gestion_riesgo": "REGLA DEL 1%: Nunca arriesgues más del 1-2% del capital de tu cuenta en una sola operación.",
+                "consejo_psicologico": "No compres por impulso. Espera a que el precio alcance la zona calculada.",
+            }
+        else:
+            result["guia_operador"] = {
+                "estado_semaforo": "ESPERAR / NO OPERAR",
+                "mensaje_principal": "El 100% de las noticias analizadas son ruido. La decisión más inteligente hoy es no operar.",
+                "checklist_pasos": [
+                    "1. Mantén tu dinero 100% en liquidez.",
+                    "2. No compres activos por aburrimiento o ansiedad.",
+                    "3. Espera pacientemente al próximo escaneo.",
+                ],
+                "regla_gestion_riesgo": "No perder dinero en días de ruido es exactamente igual a ganar dinero.",
+                "consejo_psicologico": "Los profesionales pasan la mayor parte del tiempo esperando la asimetría correcta.",
+            }
+
     return result
+
