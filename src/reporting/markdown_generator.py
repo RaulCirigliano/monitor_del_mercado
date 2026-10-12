@@ -1,0 +1,112 @@
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
+from config import settings
+from src.models import AnalysisBatch, OpportunityCard
+
+
+class MarkdownReportGenerator:
+    """Genera reportes ejecutivos en formato Markdown estandarizado."""
+
+    def __init__(self, output_dir: Optional[Path] = None):
+        self.output_dir = output_dir or settings.reports_dir
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+    def _render_card(self, card: OpportunityCard) -> str:
+        """Renderiza una ficha estructurada individual."""
+        stop_line = f"- **Stop Loss / Invalidación:** `{card.stop_loss_sugerido}`\n" if card.stop_loss_sugerido else ""
+        target_line = f"- **Target Proyectado:** `{card.target_proyectado}`\n" if card.target_proyectado else ""
+        sources = "\n".join(f"  - {s}" for s in card.fuentes_relacionadas) if card.fuentes_relacionadas else "  - Monitoreo de flujo informativo"
+
+        return f"""### 📌 {card.ticker} — {card.asset_name}
+* **Clasificación:** `{card.tipo}`
+* **Diagnóstico de Sentimiento:** `{card.sentimiento_mercado}`
+* **Score de Asimetría:** **{card.score_asimetria}/10**
+* **Ratio Riesgo/Beneficio:** **1 a {card.ratio_riesgo_beneficio:.1f}**
+* **Horizonte Temporal:** `{card.horizonte_temporal}`
+* **Nivel de Entrada / Acumulación:** `{card.nivel_entrada_sugerido}`
+{stop_line}{target_line}
+#### 💡 Tesis Contrarian (Psicología de Masas):
+> {card.tesis_contrarian}
+
+#### ⚡ Catalizador Detonante:
+{card.catalizador_detonante}
+
+#### 🏛️ Soporte Secular y Viento de Cola:
+{card.soporte_secular}
+
+#### 🔗 Fuentes / Referencias:
+{sources}
+
+---
+"""
+
+    def generate_report(self, batch: AnalysisBatch) -> Path:
+        """Escribe el reporte completo y retorna la ruta del archivo generado."""
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        time_str = datetime.now().strftime("%H%M%S")
+        filename = f"{date_str}_oportunidades_{time_str}.md"
+        report_path = self.output_dir / filename
+
+        pct_noise = (
+            (batch.total_ruido_descartado / batch.total_noticias_analizadas * 100.0)
+            if batch.total_noticias_analizadas > 0
+            else 0.0
+        )
+
+        md_content = f"""# 🦅 Monitor del Mercado — Reporte de Inteligencia Contrarian
+**Generado:** {batch.timestamp}  
+**Misión:** Detección de oportunidades de alta asimetría matemática ($R/B \\ge 1:3$) y capitulaciones de mercado.
+
+---
+
+## 📊 Métricas del Escaneo
+| Métrica | Valor |
+| :--- | :--- |
+| **Eventos / Noticias Ingestadas** | {batch.total_noticias_analizadas} |
+| **Ruido Mediático Descartado** | {batch.total_ruido_descartado} ({pct_noise:.1f}%) |
+| **Oportunidades Asimétricas Detectadas** | {len(batch.oportunidades)} |
+| **Alertas de Peligro / Trampas de Mercado** | {len(batch.alertas_peligro)} |
+
+---
+
+## 🧠 Conclusiones Internas y Proceso de Razonamiento
+> **Veredicto Ejecutivo:** {batch.sintesis_ejecutiva}
+
+### Deducciones por etapas del motor de IA:
+"""
+        for idx, concl in enumerate(batch.conclusiones_internas, 1):
+            md_content += f"* **Etapa {idx}:** {concl}\n"
+
+        md_content += """
+---
+
+## 🎯 1. Fichas de Oportunidad Asimétrica (Capitulación & Valor)
+"""
+
+        if batch.oportunidades:
+            for card in batch.oportunidades:
+                md_content += self._render_card(card)
+        else:
+            md_content += "_No se detectaron capitulaciones con ratio $R/B \\ge 1:3$ en este ciclo. Disciplina de capital activa: el 100% califica como ruido o sin asimetría suficiente._\n\n---\n"
+
+        md_content += """
+## ⚠️ 2. Alertas de Peligro y Trampas de Mercado (Euforia & Techos)
+"""
+
+        if batch.alertas_peligro:
+            for card in batch.alertas_peligro:
+                md_content += self._render_card(card)
+        else:
+            md_content += "_No se identificaron trampas extremas de euforia activa en las fuentes escaneadas._\n\n---\n"
+
+        md_content += """
+## 📜 Principio de Independencia
+> **Aviso:** Monitor del Mercado es un sistema de investigación e inteligencia computacional pura. No ejecuta órdenes de compra/venta ni constituye asesoramiento financiero. Toda decisión de inversión requiere gestión de riesgo personal.
+"""
+
+        with open(report_path, "w", encoding="utf-8") as f:
+            f.write(md_content)
+
+        return report_path

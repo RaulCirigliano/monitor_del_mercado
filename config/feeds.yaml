@@ -1,0 +1,34 @@
+# Feeds RSS curados por categorías para el Monitor del Mercado
+categories:
+  macro_and_markets:
+    name: "Macroeconomía y Mercados Globales"
+    feeds:
+      - name: "Yahoo Finance Top"
+        url: "https://finance.yahoo.com/news/rssindex"
+        weight: 1.0
+      - name: "MarketWatch Top Stories"
+        url: "https://feeds.content.dowjones.io/public/rss/mw_topstories"
+        weight: 1.0
+      - name: "CNBC Economy"
+        url: "https://search.cnbc.com/rs/search/view.html?partnerId=2000&keywords=economy&sort=date&output=rss"
+        weight: 0.9
+
+  commodities_and_energy:
+    name: "Materias Primas, Metales y Energía"
+    feeds:
+      - name: "OilPrice Main"
+        url: "https://oilprice.com/rss/main"
+        weight: 1.0
+      - name: "Mining.com"
+        url: "https://www.mining.com/feed/"
+        weight: 0.9
+
+  crypto_and_alternatives:
+    name: "Criptoactivos y Descentralización"
+    feeds:
+      - name: "CoinDesk"
+        url: "https://www.coindesk.com/arc/outboundfeeds/rss/"
+        weight: 1.0
+      - name: "Cointelegraph"
+        url: "https://cointelegraph.com/rss"
+        weight: 0.9
