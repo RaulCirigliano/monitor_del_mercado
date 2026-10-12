@@ -158,7 +158,7 @@ function renderReport(report) {
   }
 
   // 4. Hoja de Ruta del Operador Novato
-  const guia = report.guia_operador;
+  const guia = report.guia_operador || synthesizeGuideForNovice(report);
   const semBadge = document.getElementById('operator-semaphore-badge');
   const semText = document.getElementById('operator-semaphore-text');
   const mainMsg = document.getElementById('operator-main-message');
@@ -193,6 +193,56 @@ function renderReport(report) {
     if (psychoAdv) psychoAdv.innerText = guia.consejo_psicologico;
   }
 }
+
+function synthesizeGuideForNovice(report) {
+  const opps = report.oportunidades || [];
+  const dangers = report.alertas_peligro || [];
+
+  if (opps.length > 0) {
+    const opp0 = opps[0];
+    return {
+      estado_semaforo: "OPERAR CON CAUTELA",
+      mensaje_principal: `Existe una oportunidad asimétrica favorable en ${opp0.ticker}. La multitud está asustada y vendiendo, permitiéndote entrar a precio de descuento con una relación beneficio/riesgo de 1 a ${opp0.ratio_riesgo_beneficio}.`,
+      checklist_pasos: [
+        `1. LOCALIZA EL ACTIVO: Abre tu plataforma de inversión y busca el ticker '${opp0.ticker}' (${opp0.asset_name || ''}).`,
+        `2. ORDEN DE COMPRA: Configura una orden límite en ${opp0.nivel_entrada_sugerido}. No compres apurado a mercado.`,
+        `3. STOP LOSS OBLIGATORIO: Coloca tu orden de venta defensiva en ${opp0.stop_loss_sugerido || 'zona defensiva'} para limitar tu riesgo.`,
+        `4. TOMA DE GANANCIAS (TAKE PROFIT): Fija tu objetivo de salida en ${opp0.target_proyectado || 'zona de target'} y retira beneficios sin codicia.`,
+        `5. PACIENCIA: Plazo estimado de ${opp0.horizonte_temporal || '3-6 meses'}. Dale tiempo a la tesis para desarrollarse.`
+      ],
+      regla_gestion_riesgo: "REGLA DEL 1%: Nunca arriesgues más del 1% o 2% del total de tu cuenta en esta operación (máx 10-20 USD por cada 1.000 USD de capital).",
+      consejo_psicologico: "No te asustes por los titulares pesimistas. El pánico de los medios es el causante del descuento. Tu ventaja como inversor contrarian es comprar cuando hay sangre y vender cuando hay fiesta."
+    };
+  } else if (dangers.length > 0) {
+    const danger0 = dangers[0];
+    return {
+      estado_semaforo: "ALERTA DE PELIGRO",
+      mensaje_principal: `El activo ${danger0.ticker} está en zona de sobrecalentamiento y euforia mediática peligrosa. Abstente de comprar.`,
+      checklist_pasos: [
+        `1. ALTO TOTAL: No compres '${danger0.ticker}' bajo ninguna circunstancia.`,
+        "2. NO TE DEJES LLEVAR POR EL FOMO: Aunque en redes digan que subirá al infinito, el precio ya está inflado.",
+        "3. SI YA TIENES ESTE ACTIVO: Considera asegurar beneficios o colocar un Stop Loss ceñido.",
+        "4. CONSERVA TU LIQUIDEZ: Tu dinero está más seguro en efectivo esperando una verdadera oportunidad."
+      ],
+      regla_gestion_riesgo: "PRESERVACIÓN DE CAPITAL: El primer objetivo de un operador novato no es hacerse rico rápido, sino evitar perder el dinero en las trampas de euforia.",
+      consejo_psicologico: "Sentirás ganas de comprar porque 'todo el mundo habla de ello'. Esa es la trampa psicológica más antigua del mercado. Recuerda: compra en el pánico, huye de la euforia."
+    };
+  } else {
+    return {
+      estado_semaforo: "ESPERAR / NO OPERAR",
+      mensaje_principal: "El mercado no ofrece ninguna oportunidad asimétrica clara hoy. Todo el flujo analizado es ruido mediático transitorio. La decisión más inteligente y rentable hoy es NO OPERAR.",
+      checklist_pasos: [
+        "1. QUÉDATE QUIETO: Hoy no toques ningún botón de compra ni de venta.",
+        "2. CONSERVA EL 100% DE TU DINERO EN EFECTIVO: El 95% de las noticias de hoy fueron descartadas como ruido publicitario o chismes sin fundamento.",
+        "3. EVITA EL ERROR N° 1 DEL NOVATO: El error más común es operar todos los días por aburrimiento o impaciencia. Los traders profesionales pasan el 80% de su tiempo observando y esperando.",
+        "4. ESPERA AL PRÓXIMO ESCANEO: Mantén el radar activo y espera a que el mercado ofrezca una verdadera capitulación con ventaja matemática."
+      ],
+      regla_gestion_riesgo: "PACIENCIA Y DISCIPLINA: No perder dinero en días de ruido es exactamente igual a ganar dinero. El efectivo es una posición ganadora.",
+      consejo_psicologico: "No sientas que estás perdiendo el tiempo por no hacer una operación hoy. La disciplina de esperar a que el precio y el pánico jueguen a tu favor es lo que separa a los perdedores de los inversores exitosos."
+    };
+  }
+}
+
 
 
 function createOpportunityCard(card) {
