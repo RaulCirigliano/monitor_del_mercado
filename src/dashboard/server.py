@@ -131,13 +131,18 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 data = {}
 
             category = data.get("category")
+            custom_directive = data.get("custom_directive")
 
             # Ejecutar escaneo a través del pipeline
             try:
                 pipeline = MarketMonitorPipeline()
-                batch = pipeline.run(category_filter=category)
+                batch = pipeline.run(
+                    category_filter=category,
+                    custom_directive=custom_directive,
+                )
                 self._set_headers(200)
                 self.wfile.write(batch.model_dump_json().encode("utf-8"))
+
             except Exception as e:
                 self._set_headers(500)
                 self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))

@@ -92,7 +92,18 @@ async function loadReportContent(filename, clickedBtn = null) {
 function renderReport(report) {
   document.getElementById('last-scan-time').innerText = `Reporte: ${report.name || 'Reciente'}`;
 
-  // 1. Conclusiones Internas
+  // 1. Conclusiones Internas y Directiva
+  const directiveBadge = document.getElementById('report-directive-badge');
+  const directiveText = document.getElementById('report-directive-text');
+  if (directiveBadge && directiveText) {
+    if (report.directiva_personalizada) {
+      directiveText.innerText = report.directiva_personalizada;
+      directiveBadge.classList.remove('hidden');
+    } else {
+      directiveBadge.classList.add('hidden');
+    }
+  }
+
   const verdictEl = document.getElementById('executive-verdict');
   verdictEl.innerText = report.sintesis_ejecutiva || "Sin veredicto consolidado disponible.";
 
@@ -107,6 +118,7 @@ function renderReport(report) {
   } else {
     stepsEl.innerHTML = '<div class="text-slate-500 italic">No se registraron etapas intermedias en este reporte.</div>';
   }
+
 
   // 2. Fichas de Oportunidad
   const oppContainer = document.getElementById('opportunities-container');
@@ -249,11 +261,22 @@ function createDangerCard(card) {
   return div;
 }
 
+function setCustomDirective(text) {
+  const input = document.getElementById('scan-custom-directive');
+  if (input) {
+    input.value = text;
+    input.focus();
+  }
+}
+
 async function triggerScan() {
   const btn = document.getElementById('btn-scan');
   const spinner = document.getElementById('scan-spinner');
   const btnText = document.getElementById('scan-btn-text');
   const category = document.getElementById('scan-category').value;
+  const customDirective = document.getElementById('scan-custom-directive')
+    ? document.getElementById('scan-custom-directive').value.trim()
+    : '';
 
   btn.disabled = true;
   spinner.classList.remove('hidden');
@@ -263,12 +286,16 @@ async function triggerScan() {
     const res = await fetch('/api/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category: category || null })
+      body: JSON.stringify({
+        category: category || null,
+        custom_directive: customDirective || null
+      })
     });
     const result = await res.json();
     await loadReportsList();
     await loadLatestReport();
     alert("¡Escaneo completado con éxito! Se han actualizado las fichas y conclusiones.");
+
   } catch (err) {
     alert("Error al ejecutar escaneo: " + err.message);
   } finally {

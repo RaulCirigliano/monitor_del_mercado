@@ -129,11 +129,64 @@ class RSSCollector:
 
         return items
 
-    def collect_all(self, category_filter: Optional[str] = None) -> List[NewsItem]:
-        """Descarga todos los feeds configurados en config/feeds.yaml."""
+    @staticmethod
+    def _extract_search_keywords(user_text: str) -> str:
+        """Extrae palabras clave de búsqueda quitando frases de relleno comunes en español."""
+        cleaned = re.sub(
+            r"^(sigue|buscar?|monitorear?|revisar?|rastrear?|analizar?|ver|atento a)\s+(las\s+noticias\s+(sobre|de|del)?|noticias\s+(sobre|de|del)?|informaci[oó]n\s+(sobre|de|del)?|a)?\s*",
+            "",
+            user_text,
+            flags=re.IGNORECASE,
+        )
+        cleaned = re.sub(r"\b(que\s+dio|que\s+dijo|seg[uú]n)\b", "", cleaned, flags=re.IGNORECASE)
+        cleaned = " ".join(cleaned.split()).strip()
+        return cleaned if cleaned else user_text
+
+    def fetch_search_news(self, query: str) -> List[NewsItem]:
+        """Descarga noticias en tiempo real para una directiva o búsqueda personalizada usando Google News RSS."""
+        import urllib.parse
+
+        cleaned_query = self._extract_search_keywords(query)
+        encoded_query = urllib.parse.quote_plus(cleaned_query)
+        url = f"https://news.google.com/rss/search?q={encoded_query}&hl=es-419&gl=AR&ceid=AR:es-419"
+
+        items = self.fetch_feed(
+            url,
+            source_name=f"Google News: '{cleaned_query}'",
+            category_name="Búsqueda Personalizada",
+        )
+
+        # Si la búsqueda limpia obtuvo pocas noticias y la frase original era distinta, complementar con la original
+        if len(items) < 3 and cleaned_query.lower() != query.lower():
+            encoded_raw = urllib.parse.quote_plus(query)
+            raw_url = f"https://news.google.com/rss/search?q={encoded_raw}&hl=es-419&gl=AR&ceid=AR:es-419"
+            raw_items = self.fetch_feed(
+                raw_url,
+                source_name=f"Google News: '{query}'",
+                category_name="Búsqueda Personalizada",
+            )
+            for it in raw_items:
+                if not any(existing.id == it.id for existing in items):
+                    items.append(it)
+
+        return items
+
+    def collect_all(
+        self,
+        category_filter: Optional[str] = None,
+        custom_query: Optional[str] = None,
+    ) -> List[NewsItem]:
+        """Descarga feeds configurados y opcionalmente noticias específicas para una directiva de búsqueda."""
+        all_news: List[NewsItem] = []
+
+        # 1. Si el usuario ingresó una directiva temática, buscar primero noticias específicas
+        if custom_query and custom_query.strip():
+            targeted_news = self.fetch_search_news(custom_query.strip())
+            all_news.extend(targeted_news)
+
+        # 2. Descargar feeds configurados en feeds.yaml
         feeds_config = settings.load_feeds()
         categories = feeds_config.get("categories", {})
-        all_news: List[NewsItem] = []
 
         for cat_key, cat_data in categories.items():
             if category_filter and category_filter != cat_key:
@@ -151,3 +204,4 @@ class RSSCollector:
                 all_news.extend(fetched)
 
         return all_news
+

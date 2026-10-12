@@ -63,9 +63,20 @@ Responde EXCLUSIVAMENTE un objeto JSON estricto con:
 """
 
 
-def build_step1_prompt(news_items_text: str, market_data_text: str) -> str:
+def build_step1_prompt(
+    news_items_text: str,
+    market_data_text: str,
+    custom_directive: Optional[str] = None,
+) -> str:
+    directive_block = ""
+    if custom_directive and custom_directive.strip():
+        directive_block = f"""
+🎯 DIRECTIVA PRIORITARIA DEL ANALISTA:
+"{custom_directive.strip()}"
+(Instrucción: Presta atención prioritaria a personas, analistas, activos o eventos relacionados con esta directiva. Audita si existe capitulación o euforia y evalúa su coherencia contrarian).
+"""
     return f"""Analiza estos eventos y cotizaciones. Emite tu conclusión interna y clasifica el ruido:
-
+{directive_block}
 NOTICIAS:
 {news_items_text}
 
@@ -75,21 +86,34 @@ MERCADO:
 Responde ÚNICAMENTE el JSON requerido con tu conclusión interna."""
 
 
-def build_step2_opportunity_prompt(ticker: str, prior_conclusion: str, market_info: str) -> str:
+def build_step2_opportunity_prompt(
+    ticker: str,
+    prior_conclusion: str,
+    market_info: str,
+    custom_directive: Optional[str] = None,
+) -> str:
+    dir_note = f"\nDirectiva del analista a considerar: '{custom_directive}'\n" if custom_directive else ""
     return f"""A partir de tu CONCLUSIÓN INTERNA PREVIA:
 "{prior_conclusion}"
-
+{dir_note}
 Y los datos del activo {ticker}:
 {market_info}
 
 Genera la Ficha Estructurada de Oportunidad Asimétrica (R/B >= 3.0) en formato JSON."""
 
 
-def build_step2_danger_prompt(ticker: str, prior_conclusion: str, market_info: str) -> str:
+def build_step2_danger_prompt(
+    ticker: str,
+    prior_conclusion: str,
+    market_info: str,
+    custom_directive: Optional[str] = None,
+) -> str:
+    dir_note = f"\nDirectiva del analista a considerar: '{custom_directive}'\n" if custom_directive else ""
     return f"""A partir de tu CONCLUSIÓN INTERNA PREVIA:
 "{prior_conclusion}"
-
+{dir_note}
 Y los datos del activo {ticker}:
 {market_info}
 
 Genera la Ficha de Trampa de Mercado / Peligro en formato JSON."""
+

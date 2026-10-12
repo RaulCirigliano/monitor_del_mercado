@@ -73,3 +73,29 @@ def test_markdown_generator():
         assert "Monitor del Mercado" in content
         assert "TLT" in content
         assert "Capitulación histórica" in content
+
+
+def test_keyword_extraction_and_custom_directive():
+    from src.ingestion.rss_collector import RSSCollector
+
+    raw_phrase = "sigue las noticias sobre las recomendaciones que dio maslaton"
+    cleaned = RSSCollector._extract_search_keywords(raw_phrase)
+    assert "maslaton" in cleaned.lower()
+    assert "recomendaciones" in cleaned.lower()
+    assert "sigue" not in cleaned.lower()
+
+    # Test de generación de reporte con directiva
+    with tempfile.TemporaryDirectory() as tmpdir:
+        gen = MarkdownReportGenerator(output_dir=Path(tmpdir))
+        batch = AnalysisBatch(
+            timestamp="2026-10-12 18:30:00",
+            total_noticias_analizadas=5,
+            total_ruido_descartado=4,
+            oportunidades=[],
+            alertas_peligro=[],
+            directiva_personalizada="Recomendaciones de Maslatón",
+        )
+        report_file = gen.generate_report(batch)
+        content = report_file.read_text(encoding="utf-8")
+        assert "Recomendaciones de Maslatón" in content
+

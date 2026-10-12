@@ -55,9 +55,11 @@ class MarkdownReportGenerator:
             else 0.0
         )
 
+        directive_line = f"**Directiva Especial:** {batch.directiva_personalizada}  \n" if batch.directiva_personalizada else ""
+
         md_content = f"""# 🦅 Monitor del Mercado — Reporte de Inteligencia Contrarian
 **Generado:** {batch.timestamp}  
-**Misión:** Detección de oportunidades de alta asimetría matemática ($R/B \\ge 1:3$) y capitulaciones de mercado.
+{directive_line}**Misión:** Detección de oportunidades de alta asimetría matemática ($R/B \\ge 1:3$) y capitulaciones de mercado.
 
 ---
 

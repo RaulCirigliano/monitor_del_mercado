@@ -16,6 +16,7 @@ def parse_markdown_report(report_path: Path) -> Dict[str, Any]:
         "conclusiones_internas": [],
         "oportunidades": [],
         "alertas_peligro": [],
+        "directiva_personalizada": None,
     }
 
     # Extraer timestamp
@@ -23,10 +24,16 @@ def parse_markdown_report(report_path: Path) -> Dict[str, Any]:
     if m_time:
         result["timestamp"] = m_time.group(1).strip()
 
+    # Extraer directiva especial si existe
+    m_dir = re.search(r"\*\*Directiva Especial:\*\*\s*(.+)", text)
+    if m_dir:
+        result["directiva_personalizada"] = m_dir.group(1).strip()
+
     # Extraer veredicto ejecutivo
     m_verdict = re.search(r"> \*\*Veredicto Ejecutivo:\*\*\s*(.+)", text)
     if m_verdict:
         result["sintesis_ejecutiva"] = m_verdict.group(1).strip()
+
 
     # Extraer conclusiones por etapa
     steps = re.findall(r"\*\s*\*\*Etapa\s*\d+:\*\*\s*(.+)", text)

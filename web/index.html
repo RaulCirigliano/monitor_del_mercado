@@ -80,6 +80,40 @@
           Ejecuta la ingesta RSS multicanal, enriquecimiento de cotizaciones con <code>yfinance</code> y evaluación en 2 fases con Ollama local (<strong class="text-slate-300">qwen2.5:3b</strong>) bajo las Tres Verdades Contraintuitivas.
         </p>
 
+        <!-- Entrada para Directiva o Mensaje Personalizado de Búsqueda -->
+        <div class="space-y-2 pt-1 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+          <div class="flex flex-wrap items-center justify-between gap-1">
+            <label for="scan-custom-directive" class="text-xs font-semibold text-cyan-300 flex items-center gap-1.5">
+              <span>🎯</span> Directiva / Mensaje de Búsqueda Personalizado (Opcional):
+            </label>
+            <span class="text-[11px] text-slate-400 font-mono">Búsqueda en vivo con Google News RSS</span>
+          </div>
+
+          <div class="relative">
+            <input id="scan-custom-directive" type="text" 
+                   placeholder="Ej: Sigue las noticias sobre las recomendaciones que dio Maslatón, impacto de tasas en bonos, petróleo y guerra..." 
+                   class="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-3.5 py-2.5 pr-8 text-xs text-white placeholder-slate-500 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none">
+            <button type="button" onclick="document.getElementById('scan-custom-directive').value=''" class="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300 text-xs cursor-pointer" title="Limpiar directiva">✕</button>
+          </div>
+
+          <!-- Sugerencias rápidas de 1 clic -->
+          <div class="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
+            <span class="text-slate-400 font-medium">Ejemplos rápidos:</span>
+            <button type="button" onclick="setCustomDirective('Sigue las noticias sobre las recomendaciones que dio Maslatón')" class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-slate-800 hover:border-cyan-500/50 transition-colors cursor-pointer">
+              💬 Maslatón (Recomendaciones)
+            </button>
+            <button type="button" onclick="setCustomDirective('Impacto de recortes de tasas de interés de la FED en bonos y acciones')" class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-slate-800 hover:border-emerald-500/50 transition-colors cursor-pointer">
+              🏛️ Tasas FED & Bonos
+            </button>
+            <button type="button" onclick="setCustomDirective('Escalada geopolítica en Medio Oriente y precio del petróleo WTI')" class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-amber-400 border border-slate-800 hover:border-amber-500/50 transition-colors cursor-pointer">
+              🛢️ Petróleo & Guerra
+            </button>
+            <button type="button" onclick="setCustomDirective('Regulaciones de inteligencia artificial y semiconductores')" class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-purple-400 border border-slate-800 hover:border-purple-500/50 transition-colors cursor-pointer">
+              🤖 IA & Semiconductores
+            </button>
+          </div>
+        </div>
+
         <div class="flex flex-wrap items-center gap-3 pt-2">
           <select id="scan-category" class="bg-slate-900 text-slate-200 border border-slate-700 rounded-lg px-3.5 py-2.5 text-xs font-medium focus:ring-1 focus:ring-cyan-500 outline-none flex-1 min-w-[260px]">
             <option value="">Todas las categorías (Macro, Commodities, Cripto)</option>
@@ -98,6 +132,7 @@
           </button>
         </div>
       </div>
+
 
       <!-- SEPARADOR -->
       <div class="border-t border-slate-800/80"></div>
@@ -260,9 +295,13 @@
             Progreso por Etapas
           </span>
         </div>
+        <div id="report-directive-badge" class="hidden mb-3 p-2.5 rounded-lg bg-cyan-950/60 border border-cyan-700/60 text-xs text-cyan-300 font-mono flex items-center gap-2">
+          <span>🎯 Directiva Aplicada:</span> <strong id="report-directive-text" class="text-white font-sans"></strong>
+        </div>
         <p id="executive-verdict" class="text-xs text-slate-300 leading-relaxed font-sans mb-3">
           Cargando conclusiones del último ciclo de escaneo...
         </p>
+
         <div id="step-deductions" class="space-y-1.5 text-xs text-slate-400 font-mono border-t border-slate-800/60 pt-3">
           <!-- Inyectado por JS -->
         </div>

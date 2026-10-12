@@ -75,3 +75,7 @@ class AnalysisBatch(BaseModel):
         default="",
         description="Veredicto final consolidado del ciclo de escaneo"
     )
+    directiva_personalizada: Optional[str] = Field(
+        default=None,
+        description="Directiva o enfoque temático solicitado por el usuario"
+    )

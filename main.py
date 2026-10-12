@@ -105,6 +105,13 @@ def main():
         default=8520,
         help="Puerto para el servidor del Dashboard web (por defecto: 8520 con auto-resolución de conflictos).",
     )
+    parser.add_argument(
+        "--directive",
+        "--prompt",
+        type=str,
+        default=None,
+        help="Directiva personalizada para orientar el escaneo (ej. 'Recomendaciones de Maslatón').",
+    )
 
     args = parser.parse_args()
 
@@ -123,8 +130,9 @@ def main():
 
     # Si se pasa --scan o no se pasa ningún argumento, ejecutar el escaneo por defecto
     pipeline = MarketMonitorPipeline(use_gemini=args.gemini)
-    pipeline.run(category_filter=args.category)
+    pipeline.run(category_filter=args.category, custom_directive=args.directive)
 
 
 if __name__ == "__main__":
     main()
+

@@ -61,7 +61,10 @@ class ContrarianEvaluator:
         )
 
     def _step1_diagnose(
-        self, news_chunk: List[NewsItem], snapshots: Dict[str, AssetSnapshot]
+        self,
+        news_chunk: List[NewsItem],
+        snapshots: Dict[str, AssetSnapshot],
+        custom_directive: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Paso 1: Emite obligatoriamente una conclusión interna y detecta candidatos o ruido."""
         news_text = "\n\n".join(item.to_compact_text() for item in news_chunk)
@@ -79,7 +82,7 @@ class ContrarianEvaluator:
         ]
         market_text = "\n".join(chunk_snaps[:4]) if chunk_snaps else "Sin cotizaciones específicas."
 
-        prompt = build_step1_prompt(news_text, market_text)
+        prompt = build_step1_prompt(news_text, market_text, custom_directive=custom_directive)
 
         try:
             return self._call_llm(
@@ -103,11 +106,17 @@ class ContrarianEvaluator:
             }
 
     def _step2_build_card(
-        self, ticker: str, prior_conclusion: str, snapshot: Optional[AssetSnapshot]
+        self,
+        ticker: str,
+        prior_conclusion: str,
+        snapshot: Optional[AssetSnapshot],
+        custom_directive: Optional[str] = None,
     ) -> Optional[OpportunityCard]:
         """Paso 2: Genera la Ficha Estructurada final partiendo de la conclusión previa."""
         market_info = snapshot.to_compact_text() if snapshot else f"Activo: {ticker}"
-        prompt = build_step2_opportunity_prompt(ticker, prior_conclusion, market_info)
+        prompt = build_step2_opportunity_prompt(
+            ticker, prior_conclusion, market_info, custom_directive=custom_directive
+        )
 
         try:
             data = self._call_llm(
@@ -145,6 +154,7 @@ class ContrarianEvaluator:
         news_items: List[NewsItem],
         snapshots: Dict[str, AssetSnapshot],
         chunk_size: int = 4,
+        custom_directive: Optional[str] = None,
     ) -> AnalysisBatch:
         """Flujo completo por etapas que garantiza alcanzar siempre una respuesta final."""
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -158,6 +168,7 @@ class ContrarianEvaluator:
                 alertas_peligro=[],
                 conclusiones_internas=["No se recibieron noticias para procesar."],
                 sintesis_ejecutiva="Ciclo sin eventos.",
+                directiva_personalizada=custom_directive,
             )
 
         conclusiones_internas: List[str] = []
@@ -171,7 +182,7 @@ class ContrarianEvaluator:
             chunk = news_items[i : i + chunk_size]
 
             # FASE 1: Pensamiento y Conclusión Interna Obligatoria
-            diag = self._step1_diagnose(chunk, snapshots)
+            diag = self._step1_diagnose(chunk, snapshots, custom_directive=custom_directive)
             concl = diag.get("conclusion_interna", "")
             if concl:
                 conclusiones_internas.append(concl)
@@ -183,7 +194,9 @@ class ContrarianEvaluator:
             if cand_op and cand_op not in seen_tickers and cand_op.strip().upper() != "NULL":
                 cand_ticker = cand_op.strip().upper()
                 seen_tickers.add(cand_ticker)
-                card = self._step2_build_card(cand_ticker, concl, snapshots.get(cand_ticker))
+                card = self._step2_build_card(
+                    cand_ticker, concl, snapshots.get(cand_ticker), custom_directive=custom_directive
+                )
                 if card and card.ratio_riesgo_beneficio >= settings.min_risk_reward_ratio:
                     valid_opportunities.append(card)
 
@@ -203,4 +216,6 @@ class ContrarianEvaluator:
             alertas_peligro=valid_dangers,
             conclusiones_internas=conclusiones_internas,
             sintesis_ejecutiva=sintesis,
+            directiva_personalizada=custom_directive,
         )
+

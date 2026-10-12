@@ -21,13 +21,23 @@ class MarketMonitorPipeline:
         self.evaluator = ContrarianEvaluator(use_gemini=use_gemini)
         self.report_generator = MarkdownReportGenerator()
 
-    def run(self, category_filter: Optional[str] = None) -> AnalysisBatch:
+    def run(
+        self,
+        category_filter: Optional[str] = None,
+        custom_directive: Optional[str] = None,
+    ) -> AnalysisBatch:
         """Ejecuta el ciclo completo de escaneo e inteligencia."""
         TerminalViewer.show_header()
 
-        # 1. Ingesta RSS
+        if custom_directive and custom_directive.strip():
+            console.print(f"[bold magenta]🎯 Directiva personalizada activa:[/bold magenta] [white]'{custom_directive.strip()}'[/white]")
+
+        # 1. Ingesta RSS (con búsqueda dirigida si hay directiva)
         with console.status("[bold green]Recolectando feeds RSS y filtrando ruido inicial...", spinner="dots"):
-            news_items = self.collector.collect_all(category_filter=category_filter)
+            news_items = self.collector.collect_all(
+                category_filter=category_filter,
+                custom_query=custom_directive,
+            )
 
         console.print(f"[bold cyan]ℹ Noticias ingestadas y limpias tras descarte inicial:[/bold cyan] {len(news_items)}")
 
@@ -39,6 +49,7 @@ class MarketMonitorPipeline:
                 total_ruido_descartado=0,
                 oportunidades=[],
                 alertas_peligro=[],
+                directiva_personalizada=custom_directive,
             )
             return batch
 
@@ -60,7 +71,10 @@ class MarketMonitorPipeline:
 
         # 3. Evaluación con IA Contrarian
         with console.status("[bold magenta]Evaluando psicología de masas y asimetría matemática con IA...", spinner="dots"):
-            batch = self.evaluator.evaluate(news_items, snapshots)
+            batch = self.evaluator.evaluate(
+                news_items, snapshots, custom_directive=custom_directive
+            )
+
 
         # 4. Generación de Reporte Markdown
         report_path = self.report_generator.generate_report(batch)
