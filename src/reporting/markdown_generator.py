@@ -43,11 +43,29 @@ class MarkdownReportGenerator:
 """
 
     def generate_report(self, batch: AnalysisBatch) -> Path:
-        """Escribe el reporte completo y retorna la ruta del archivo generado."""
+        """Escribe el reporte completo en carpetas por fecha y retorna la ruta del archivo generado."""
+        import re
+
         date_str = datetime.now().strftime("%Y-%m-%d")
         time_str = datetime.now().strftime("%H%M%S")
-        filename = f"{date_str}_oportunidades_{time_str}.md"
-        report_path = self.output_dir / filename
+
+        # 1. Crear subcarpeta por fecha: reportes/YYYY-MM-DD/
+        date_folder = self.output_dir / date_str
+        date_folder.mkdir(parents=True, exist_ok=True)
+
+        # 2. Asignar modo y nombre representativo
+        if batch.directiva_personalizada and batch.directiva_personalizada.strip():
+            batch.modo_escaneo = "BUSQUEDA_ESPECIFICA"
+            slug = re.sub(r"[^a-zA-Z0-9ñÑ]+", "_", batch.directiva_personalizada.strip()).strip("_")[:25].lower()
+            slug = slug or "directiva"
+            filename = f"ESPECIFICO_{slug}_{date_str}_{time_str}.md"
+            modo_label = f"🎯 BÚSQUEDA ESPECÍFICA: \"{batch.directiva_personalizada}\""
+        else:
+            batch.modo_escaneo = "RADAR_AUTONOMO"
+            filename = f"RADAR_{date_str}_{time_str}.md"
+            modo_label = "🛰️ RADAR AUTÓNOMO"
+
+        report_path = date_folder / filename
 
         pct_noise = (
             (batch.total_ruido_descartado / batch.total_noticias_analizadas * 100.0)
@@ -58,10 +76,13 @@ class MarkdownReportGenerator:
         directive_line = f"**Directiva Especial:** {batch.directiva_personalizada}  \n" if batch.directiva_personalizada else ""
 
         md_content = f"""# 🦅 Monitor del Mercado — Reporte de Inteligencia Contrarian
-**Generado:** {batch.timestamp}  
+**Modo de Escaneo:** `{modo_label}`  
+**Fecha de Emisión:** {batch.timestamp}  
+**Vigencia Táctica:** 🟢 VIGENTE (Validez estimada: {batch.horas_vigencia} horas)  
 {directive_line}**Misión:** Detección de oportunidades de alta asimetría matemática ($R/B \\ge 1:3$) y capitulaciones de mercado.
 
 ---
+
 
 ## 📊 Métricas del Escaneo
 | Métrica | Valor |

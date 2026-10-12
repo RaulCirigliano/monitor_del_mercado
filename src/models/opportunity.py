@@ -79,10 +79,23 @@ class AnalysisBatch(BaseModel):
         default=None,
         description="Directiva o enfoque temático solicitado por el usuario"
     )
+    modo_escaneo: Literal["RADAR_AUTONOMO", "BUSQUEDA_ESPECIFICA"] = Field(
+        default="RADAR_AUTONOMO",
+        description="Modo bajo el cual se generó el escaneo"
+    )
+    vigente: bool = Field(
+        default=True,
+        description="Indica si la tesis del reporte sigue vigente"
+    )
+    horas_vigencia: int = Field(
+        default=48,
+        description="Horas de validez táctica estimada para las ideas del reporte"
+    )
     guia_operador: Optional["GuiaOperador"] = Field(
         default=None,
         description="Plan de acción paso a paso para el operador novato"
     )
+
 
 
 class GuiaOperador(BaseModel):

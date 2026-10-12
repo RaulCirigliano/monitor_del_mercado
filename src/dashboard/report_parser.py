@@ -9,9 +9,26 @@ def parse_markdown_report(report_path: Path) -> Dict[str, Any]:
         return {}
 
     text = report_path.read_text(encoding="utf-8")
+    from datetime import datetime
+
+
+    # Vigencia y relevancia temporal calculada a partir de fecha y hora
+    mtime = report_path.stat().st_mtime
+    file_dt = datetime.fromtimestamp(mtime)
+    hours_old = max(0.0, (datetime.now() - file_dt).total_seconds() / 3600.0)
+    es_vigente = hours_old <= 48.0
+
+    # Modo de escaneo
+    modo_escaneo = "BUSQUEDA_ESPECIFICA" if report_path.name.startswith("ESPECIFICO_") else "RADAR_AUTONOMO"
+
     result: Dict[str, Any] = {
         "name": report_path.name,
+        "date_folder": report_path.parent.name if report_path.parent.name != "reportes" else "General",
         "timestamp": "",
+        "modo_escaneo": modo_escaneo,
+        "es_vigente": es_vigente,
+        "horas_antiguedad": round(hours_old, 1),
+        "estado_vigencia": "🟢 VIGENTE (Activo)" if es_vigente else "⚪ HISTÓRICO (Caducado)",
         "sintesis_ejecutiva": "",
         "conclusiones_internas": [],
         "oportunidades": [],
@@ -20,9 +37,18 @@ def parse_markdown_report(report_path: Path) -> Dict[str, Any]:
     }
 
     # Extraer timestamp
-    m_time = re.search(r"\*\*Generado:\*\*\s*(.+)", text)
+    m_time = re.search(r"\*\*(?:Fecha de Emisión|Generado):\*\*\s*(.+)", text)
     if m_time:
         result["timestamp"] = m_time.group(1).strip()
+
+    # Extraer modo explícito si está en el texto
+    m_modo = re.search(r"\*\*Modo de Escaneo:\*\*\s*`([^`]+)`", text)
+    if m_modo:
+        modo_txt = m_modo.group(1).strip()
+        if "BÚSQUEDA ESPECÍFICA" in modo_txt:
+            result["modo_escaneo"] = "BUSQUEDA_ESPECIFICA"
+        elif "RADAR" in modo_txt:
+            result["modo_escaneo"] = "RADAR_AUTONOMO"
 
     # Extraer directiva especial si existe
     m_dir = re.search(r"\*\*Directiva Especial:\*\*\s*(.+)", text)
@@ -34,10 +60,10 @@ def parse_markdown_report(report_path: Path) -> Dict[str, Any]:
     if m_verdict:
         result["sintesis_ejecutiva"] = m_verdict.group(1).strip()
 
-
     # Extraer conclusiones por etapa
     steps = re.findall(r"\*\s*\*\*Etapa\s*\d+:\*\*\s*(.+)", text)
     result["conclusiones_internas"] = [s.strip() for s in steps]
+
 
     # Extraer tarjetas de oportunidad
     # Cada tarjeta inicia con ### 📌 TICKER — NOMBRE

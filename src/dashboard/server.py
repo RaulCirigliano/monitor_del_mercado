@@ -51,19 +51,36 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             return
 
         elif path == "/api/reports":
+            from datetime import datetime
             reports = sorted(
-                settings.reports_dir.glob("*.md"),
+                settings.reports_dir.rglob("*.md"),
                 key=lambda p: p.stat().st_mtime,
                 reverse=True,
             )
-            payload = [{"name": r.name, "size": r.stat().st_size} for r in reports]
+            payload = []
+            for r in reports:
+                hours_old = max(0.0, (datetime.now() - datetime.fromtimestamp(r.stat().st_mtime)).total_seconds() / 3600.0)
+                is_vigente = hours_old <= 48.0
+                modo = "BUSQUEDA_ESPECIFICA" if r.name.startswith("ESPECIFICO_") else "RADAR_AUTONOMO"
+                rel_path = str(r.relative_to(settings.reports_dir))
+                date_folder = r.parent.name if r.parent != settings.reports_dir else "General"
+
+                payload.append({
+                    "name": r.name,
+                    "rel_path": rel_path,
+                    "date_folder": date_folder,
+                    "size": r.stat().st_size,
+                    "modo": modo,
+                    "es_vigente": is_vigente,
+                    "horas_antiguedad": round(hours_old, 1),
+                })
             self._set_headers(200)
             self.wfile.write(json.dumps(payload).encode("utf-8"))
             return
 
         elif path == "/api/reports/latest":
             reports = sorted(
-                settings.reports_dir.glob("*.md"),
+                settings.reports_dir.rglob("*.md"),
                 key=lambda p: p.stat().st_mtime,
                 reverse=True,
             )
@@ -78,16 +95,27 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             return
 
         elif path.startswith("/api/reports/"):
-            filename = path.replace("/api/reports/", "")
-            target_file = settings.reports_dir / filename
-            if not target_file.exists():
+            from urllib.parse import unquote
+            rel_path = unquote(path.replace("/api/reports/", ""))
+            target_file = (settings.reports_dir / rel_path).resolve()
+
+            # Fallback: si no existe en esa ruta exacta, buscar por nombre de archivo
+            if not target_file.exists() or not target_file.is_file():
+                filename = Path(rel_path).name
+                matches = list(settings.reports_dir.rglob(filename))
+                if matches:
+                    target_file = matches[0]
+
+            if not target_file.exists() or not target_file.is_file():
                 self._set_headers(404)
-                self.wfile.write(json.dumps({"error": "Reporte no encontrado"}).encode("utf-8"))
+                self.wfile.write(json.dumps({"error": f"Reporte '{rel_path}' no encontrado"}).encode("utf-8"))
                 return
+
             data = parse_markdown_report(target_file)
             self._set_headers(200)
             self.wfile.write(json.dumps(data).encode("utf-8"))
             return
+
 
         elif path == "/api/ticker":
             symbol = query.get("symbol", [""])[0].strip()

@@ -36,6 +36,10 @@ class TerminalViewer:
         table.add_row("Ruido Descartado", f"{batch.total_ruido_descartado} ({pct_noise:.1f}%)")
         table.add_row("Oportunidades Asimétricas (R/B ≥ 1:3)", str(len(batch.oportunidades)))
         table.add_row("Alertas de Trampas de Mercado", str(len(batch.alertas_peligro)))
+        modo_str = "🛰️ Radar Autónomo" if batch.modo_escaneo == "RADAR_AUTONOMO" else f"🎯 Búsqueda: '{batch.directiva_personalizada}'"
+        table.add_row("Modo de Operación", modo_str)
+        table.add_row("Vigencia Táctica", "🟢 Vigente (48h)" if batch.vigente else "⚪ Histórico")
+
 
         console.print(table)
         console.print()

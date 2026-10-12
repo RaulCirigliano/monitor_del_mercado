@@ -21,25 +21,70 @@ async function fetchStatus() {
   }
 }
 
+let allReportsCache = [];
+let currentReportsTab = 'vigentes';
+let radarTimerInterval = null;
+let radarCountdownSeconds = 0;
+
+function filterReportsTab(tab) {
+  currentReportsTab = tab;
+  const btnVig = document.getElementById('filter-vigentes-btn');
+  const btnTod = document.getElementById('filter-todos-btn');
+
+  if (tab === 'vigentes') {
+    btnVig.className = 'px-2.5 py-1 rounded bg-cyan-950 text-cyan-300 border border-cyan-500 font-bold transition-all cursor-pointer';
+    btnTod.className = 'px-2.5 py-1 rounded bg-slate-900 text-slate-400 border border-slate-800 transition-all cursor-pointer';
+  } else {
+    btnTod.className = 'px-2.5 py-1 rounded bg-cyan-950 text-cyan-300 border border-cyan-500 font-bold transition-all cursor-pointer';
+    btnVig.className = 'px-2.5 py-1 rounded bg-slate-900 text-slate-400 border border-slate-800 transition-all cursor-pointer';
+  }
+
+  renderReportsListButtons();
+}
+
+function renderReportsListButtons() {
+  const container = document.getElementById('reports-list');
+  container.innerHTML = '';
+
+  const listToRender = currentReportsTab === 'vigentes'
+    ? allReportsCache.filter(r => r.es_vigente)
+    : allReportsCache;
+
+  if (!listToRender || listToRender.length === 0) {
+    const msg = currentReportsTab === 'vigentes'
+      ? 'No hay reportes vigentes de las últimas 48h. Haz clic en "Historial Completo" para ver anteriores.'
+      : 'No hay reportes generados aún.';
+    container.innerHTML = `<span class="text-slate-500 italic text-xs">${msg}</span>`;
+    return;
+  }
+
+  listToRender.forEach(r => {
+    const btn = document.createElement('button');
+    const isVigenteDot = r.es_vigente
+      ? '<span class="w-2 h-2 rounded-full bg-emerald-400 inline-block shadow-[0_0_6px_rgba(52,211,153,0.8)]"></span>'
+      : '<span class="w-2 h-2 rounded-full bg-slate-600 inline-block"></span>';
+    const modeIcon = r.modo === 'BUSQUEDA_ESPECIFICA' ? '🎯' : '🛰️';
+    const folderLabel = r.date_folder && r.date_folder !== 'General' ? `[${r.date_folder}] ` : '';
+
+    btn.className = 'px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/60 transition-colors cursor-pointer flex items-center gap-1.5 text-xs';
+    btn.innerHTML = `${isVigenteDot} <span>${modeIcon} ${escapeHtml(folderLabel + r.name)}</span>`;
+    btn.onclick = () => loadReportContent(r.rel_path || r.name, btn);
+    container.appendChild(btn);
+  });
+}
+
 async function loadReportsList() {
   try {
     const res = await fetch('/api/reports');
-    const reports = await res.json();
-    const container = document.getElementById('reports-list');
-    container.innerHTML = '';
+    allReportsCache = await res.json();
 
-    if (!reports || reports.length === 0) {
-      container.innerHTML = '<span class="text-slate-500 italic">No hay reportes generados aún.</span>';
-      return;
-    }
+    const vigentes = allReportsCache.filter(r => r.es_vigente);
+    const countVig = document.getElementById('count-vigentes');
+    const countTod = document.getElementById('count-todos');
+    if (countVig) countVig.innerText = vigentes.length;
+    if (countTod) countTod.innerText = allReportsCache.length;
 
-    reports.forEach(r => {
-      const btn = document.createElement('button');
-      btn.className = 'px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/60 transition-colors cursor-pointer';
-      btn.innerText = r.name;
-      btn.onclick = () => loadReportContent(r.name, btn);
-      container.appendChild(btn);
-    });
+    renderReportsListButtons();
   } catch (err) {
     console.error("Error cargando lista de reportes:", err);
   }
@@ -59,7 +104,7 @@ async function loadLatestReport() {
   }
 }
 
-async function loadReportContent(filename, clickedBtn = null) {
+async function loadReportContent(targetPath, clickedBtn = null) {
   try {
     // Marcar botón activo
     if (clickedBtn) {
@@ -71,9 +116,43 @@ async function loadReportContent(filename, clickedBtn = null) {
       clickedBtn.classList.add('bg-cyan-950', 'border-cyan-500', 'text-cyan-300');
     }
 
-    const res = await fetch(`/api/reports/${encodeURIComponent(filename)}`);
+    const res = await fetch(`/api/reports/${encodeURIComponent(targetPath)}`);
     const reportData = await res.json();
     renderReport(reportData);
+
+    // Banner de vigencia y modo
+    const banner = document.getElementById('report-vigencia-banner');
+    const vigBadge = document.getElementById('report-vigencia-badge');
+    const modeBadge = document.getElementById('report-mode-badge');
+    const folderBadge = document.getElementById('report-folder-badge');
+    const ageText = document.getElementById('report-age-text');
+
+    if (banner && vigBadge) {
+      banner.classList.remove('hidden');
+      if (reportData.es_vigente) {
+        vigBadge.className = 'px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800';
+        vigBadge.innerText = '🟢 VIGENTE (Activo)';
+      } else {
+        vigBadge.className = 'px-2 py-0.5 rounded text-[11px] font-bold bg-slate-900 text-slate-400 border border-slate-700';
+        vigBadge.innerText = '⚪ HISTÓRICO (Caducado)';
+      }
+
+      if (modeBadge) {
+        modeBadge.innerText = reportData.modo_escaneo === 'BUSQUEDA_ESPECIFICA'
+          ? '🎯 Búsqueda Específica'
+          : '🛰️ Radar Autónomo';
+      }
+
+      if (folderBadge) {
+        folderBadge.innerText = `Carpeta: ${reportData.date_folder || 'Raíz'}`;
+      }
+
+      if (ageText) {
+        ageText.innerText = reportData.horas_antiguedad !== undefined
+          ? `Emitido hace ${reportData.horas_antiguedad} h`
+          : '';
+      }
+    }
 
     // Desplazamiento suave directo hacia las Conclusiones Internas
     const box = document.getElementById('conclusions-box');
@@ -88,6 +167,45 @@ async function loadReportContent(filename, clickedBtn = null) {
     console.error("Error cargando reporte:", err);
   }
 }
+
+function toggleContinuousRadar() {
+  const select = document.getElementById('radar-interval');
+  const badge = document.getElementById('radar-countdown-badge');
+  const intervalMin = parseInt(select.value, 10);
+
+  if (radarTimerInterval) {
+    clearInterval(radarTimerInterval);
+    radarTimerInterval = null;
+  }
+
+  if (intervalMin <= 0) {
+    if (badge) badge.classList.add('hidden');
+    return;
+  }
+
+  if (badge) badge.classList.remove('hidden');
+  radarCountdownSeconds = intervalMin * 60;
+  updateRadarCountdownDisplay();
+
+  radarTimerInterval = setInterval(() => {
+    radarCountdownSeconds--;
+    if (radarCountdownSeconds <= 0) {
+      radarCountdownSeconds = intervalMin * 60;
+      // Disparar escaneo radar en segundo plano sin bloquear al usuario
+      triggerScan(true);
+    }
+    updateRadarCountdownDisplay();
+  }, 1000);
+}
+
+function updateRadarCountdownDisplay() {
+  const el = document.getElementById('radar-countdown-text');
+  if (!el) return;
+  const m = Math.floor(radarCountdownSeconds / 60);
+  const s = radarCountdownSeconds % 60;
+  el.innerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
 
 function renderReport(report) {
   document.getElementById('last-scan-time').innerText = `Reporte: ${report.name || 'Reciente'}`;
@@ -356,7 +474,7 @@ function setCustomDirective(text) {
   }
 }
 
-async function triggerScan() {
+async function triggerScan(isAutomatic = false) {
   const btn = document.getElementById('btn-scan');
   const spinner = document.getElementById('scan-spinner');
   const btnText = document.getElementById('scan-btn-text');
@@ -367,7 +485,7 @@ async function triggerScan() {
 
   btn.disabled = true;
   spinner.classList.remove('hidden');
-  btnText.innerText = "Escaneando mercado e IA...";
+  btnText.innerText = isAutomatic ? "Radar continuo escaneando..." : "Escaneando mercado e IA...";
 
   try {
     const res = await fetch('/api/scan', {
@@ -381,10 +499,18 @@ async function triggerScan() {
     const result = await res.json();
     await loadReportsList();
     await loadLatestReport();
-    alert("¡Escaneo completado con éxito! Se han actualizado las fichas y conclusiones.");
-
+    if (!isAutomatic) {
+      alert("¡Escaneo completado con éxito! Se han actualizado las fichas y conclusiones.");
+    } else {
+      console.log("Radar continuo: nuevo escaneo completado y archivado.");
+    }
   } catch (err) {
-    alert("Error al ejecutar escaneo: " + err.message);
+    if (!isAutomatic) {
+      alert("Error al ejecutar escaneo: " + err.message);
+    } else {
+      console.warn("Radar continuo error:", err);
+    }
+
   } finally {
     btn.disabled = false;
     spinner.classList.add('hidden');

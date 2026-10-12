@@ -131,7 +131,28 @@
             🔄 Recargar
           </button>
         </div>
+
+        <!-- Control de Modo Radar Continuo en Bucle -->
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800/60 mt-3 text-xs">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-slate-300 font-semibold flex items-center gap-1.5">
+              <span>🔁</span> Radar Continuo Desatendido:
+            </span>
+            <select id="radar-interval" onchange="toggleContinuousRadar()" class="bg-slate-900 text-slate-300 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-cyan-500 outline-none">
+              <option value="0">Desactivado (Escaneo Manual)</option>
+              <option value="30">Escanear cada 30 minutos</option>
+              <option value="60">Escanear cada 60 minutos</option>
+              <option value="120">Escanear cada 2 horas</option>
+            </select>
+          </div>
+
+          <div id="radar-countdown-badge" class="hidden items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-950/70 border border-cyan-800/70 text-cyan-300 font-mono text-[11px]">
+            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+            <span>Próximo radar en: <strong id="radar-countdown-text">60:00</strong></span>
+          </div>
+        </div>
       </div>
+
 
 
       <!-- SEPARADOR -->
@@ -272,18 +293,39 @@
     <!-- Banner de Razonamiento Interno y Conclusiones de la IA con Selector de Reportes Arriba de Todo -->
     <div id="conclusions-box" class="glass-card rounded-xl p-5 border-amber-500/30 bg-gradient-to-r from-amber-950/15 via-[#121826] to-[#121826] space-y-4">
       
-      <!-- 1. ARRIBA DE TODO: Selector de Archivos de Reporte Markdown -->
-      <div class="space-y-2 pb-3 border-b border-slate-800/80">
+      <!-- 1. ARRIBA DE TODO: Selector y Filtro de Historial de Reportes -->
+      <div class="space-y-3 pb-3 border-b border-slate-800/80">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-            <span>📜</span> Archivos de Reporte Markdown (Haz clic para cargar sus conclusiones al instante):
+            <span>📜</span> Historial de Reportes (Organizado por Fecha y Relevancia):
           </h4>
-          <span class="text-[11px] text-cyan-400 font-mono">Selección en vivo</span>
+          <!-- Pestañas de Filtrado -->
+          <div class="flex items-center gap-1.5 text-xs font-mono">
+            <button id="filter-vigentes-btn" onclick="filterReportsTab('vigentes')" class="px-2.5 py-1 rounded bg-cyan-950 text-cyan-300 border border-cyan-500 font-bold transition-all cursor-pointer">
+              🟢 Vigentes (<span id="count-vigentes">0</span>)
+            </button>
+            <button id="filter-todos-btn" onclick="filterReportsTab('todos')" class="px-2.5 py-1 rounded bg-slate-900 text-slate-400 border border-slate-800 transition-all cursor-pointer">
+              📁 Historial Completo (<span id="count-todos">0</span>)
+            </button>
+          </div>
         </div>
+
+        <!-- Lista dinámica de botones de reportes -->
         <div id="reports-list" class="flex flex-wrap gap-2 text-xs font-mono">
           <!-- Inyectado por JS -->
         </div>
+
+        <!-- Banner de Estado de Vigencia y Modo del Reporte Activo -->
+        <div id="report-vigencia-banner" class="hidden p-2 rounded-lg bg-slate-950/70 border border-slate-800 text-xs font-mono flex flex-wrap items-center justify-between gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <span id="report-vigencia-badge" class="px-2 py-0.5 rounded text-[11px] font-bold"></span>
+            <span id="report-mode-badge" class="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300 text-[11px]"></span>
+            <span id="report-folder-badge" class="text-slate-400 text-[11px]"></span>
+          </div>
+          <span id="report-age-text" class="text-slate-400 text-[11px]"></span>
+        </div>
       </div>
+
 
       <!-- 2. CONTENIDO DE LAS CONCLUSIONES INTERNAS -->
       <div>
