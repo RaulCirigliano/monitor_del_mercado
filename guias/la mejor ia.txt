@@ -1,0 +1,51 @@
+trader-deepseek:latest    bee0bdd53343    5.2 GB    56 minutes ago    
+trader-ia:latest          f91bf7c435ee    4.7 GB    2 hours ago       
+trader-qwen:latest        f05afe00856f    1.9 GB    2 hours ago       
+qwen2.5:3b                357c53fb659c    1.9 GB    3 hours ago       
+deepseek-r1:8b            6995872bfe4c    5.2 GB    2 days ago        
+llama3:latest             365c0bd3c000    4.7 GB    3 days ago        
+llava:7b                  8dd30f6b0cb1    4.7 GB    10 days ago       
+qwen2.5-coder:7b          dae161e27b0e    4.7 GB    10 days ago       
+qwen2.5:7b                845dbda0ea48    4.7 GB    10 days ago       
+qwen2.5-coder:3b          f72c60cabf62    1.9 GB    10 days ago       
+llama3.2:3b               a80c4f17acd5    2.0 GB    10 days ago 
+que ia recominedas para la aplicacion, piensas que la que tenemos es la mejor?
+Para responderte con total precisión, acabo de auditar tanto los modelos que tienes instalados como el hardware real de tu equipo:
+
+Tu procesador: AMD Ryzen 5 4600G (6 núcleos / 12 hilos) con gráficos integrados Radeon Vega.
+Tu memoria RAM: 14 GB DDR4 disponibles para todo el sistema (sin tarjeta gráfica Nvidia dedicada con VRAM independiente).
+Bajo estas condiciones reales, aquí está el veredicto definitivo:
+
+🏆 Veredicto: ¿Es qwen2.5:3b el mejor para esta aplicación?
+Sí, para ejecución local en tu máquina actual, qwen2.5:3b es la mejor opción posible.
+
+En la categoría de modelos ligeros (sub-4B), Qwen 2.5 es actualmente el estándar número 1 del mundo en dos cosas críticas para este proyecto:
+
+Seguimiento estricto de esquemas JSON (no inventa sintaxis ni rompe parsers).
+Excelente comprensión del idioma español y jerga financiera.
+Velocidad y consumo: Solo pesa 1.9 GB, carga al instante en RAM y procesa cada bloque en ~15-25 segundos en tu procesador, dejando más de 10 GB de RAM libres para tu sistema, el navegador y tu otro bot.
+🔍 Análisis de los otros modelos que tienes en Ollama:
+1. Los modelos trader-* (trader-qwen, trader-ia, trader-deepseek)
+⚠️ NO debes usarlos en el Monitor del Mercado.
+Al inspeccionar el archivo de configuración interno de trader-qwen:latest, tiene hardcodeado un System Prompt exclusivo para tu bot de ejecución intradiaria:
+json
+
+
+{"signal": "MANTENER", "reason": "Explicacion concisa combinando VWAP, osciladores..."}
+Si conectas esos modelos al Monitor del Mercado, colisionarán: el modelo intentará responderte si compra o vende con VWAP en vez de redactar el reporte contrarian de 5 fases que requiere este radar. Esos modelos déjalos exclusivamente para tu bot de operaciones.
+2. deepseek-r1:8b (5.2 GB)
+❌ Desaconsejado para este monitor.
+R1 es un modelo de razonamiento profundo que emite miles de tokens internos dentro de etiquetas <think>...</think>.
+En un procesador corriendo en CPU, generar ese monólogo de pensamiento por cada noticia haría que un solo escaneo demore entre 5 y 10 minutos, y además las etiquetas <think> pueden corromper la extracción estricta del JSON.
+3. qwen2.5:7b (4.7 GB)
+⚖️ El único que le compite a nivel analítico:
+Ventaja: Su capacidad de deducción macroeconómica, detección de trampas retóricas e ironía en los medios es notablemente superior al 3B.
+Desventaja en tu equipo: Al pesar 4.7 GB y correr sobre CPU, su velocidad de generación cae a ~5-8 palabras por segundo. Un escaneo completo que en 3B toma 1 minuto, en 7B te tomará entre 3 y 5 minutos.
+Cuándo usarlo: Si vas a hacer una Búsqueda Específica puntual (ej: auditar Maslatón o bonos del tesoro) y no te molesta esperar unos minutos a cambio de un análisis más profundo.
+4. llama3:latest (8B) y llama3.2:3b (2 GB)
+Qwen 2.5 supera a Llama 3/3.2 de manera contundente cuando se trata de:
+Generar respuestas en español neutral.
+Respetar las claves y tipos de datos JSON sin salirse del molde.
+🚀 Recomendación práctica:
+Para operar 100% local y gratis: Mantén qwen2.5:3b como motor predeterminado en tu .env. Es el más ágil, no satura tu procesador y ahora con el timeout de 120s tiene margen de sobra para razonar con calma sin fallar.
+Si quieres razonamiento nivel Wall Street sin consumir recursos de tu PC: El código del Monitor ya viene con soporte para Gemini 2.0 Flash. Si en tu archivo .env le agregas una clave gratuita de Google AI Studio (GEMINI_API_KEY=...), el análisis pasa a procesarse en la nube en 1 a 2 segundos, con la potencia de un modelo de última generación y cero carga para tu CPU Ryzen.

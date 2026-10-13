@@ -24,6 +24,8 @@ async function fetchStatus() {
 let allReportsCache = [];
 let currentReportsTab = 'vigentes';
 let activeReportPath = null;
+let currentActiveReport = null;
+let currentInjectPayload = null;
 let radarTimerInterval = null;
 let radarCountdownSeconds = 0;
 
@@ -277,6 +279,7 @@ function updateRadarCountdownDisplay() {
 
 
 function renderReport(report) {
+  currentActiveReport = report;
   document.getElementById('last-scan-time').innerText = `Reporte: ${report.name || 'Reciente'}`;
 
   // 1. Conclusiones Internas y Directiva
@@ -321,8 +324,8 @@ function renderReport(report) {
       </div>
     `;
   } else {
-    opportunities.forEach(card => {
-      oppContainer.appendChild(createOpportunityCard(card));
+    opportunities.forEach((card, idx) => {
+      oppContainer.appendChild(createOpportunityCard(card, idx));
     });
   }
 
@@ -506,7 +509,7 @@ function synthesizeGuideForNovice(report) {
 
 
 
-function createOpportunityCard(card) {
+function createOpportunityCard(card, oppIndex = 0) {
   const div = document.createElement('div');
   div.className = 'glass-card rounded-xl p-5 border-emerald-500/30 flex flex-col justify-between space-y-4 hover:border-emerald-500/60 transition-all';
   
@@ -581,9 +584,15 @@ function createOpportunityCard(card) {
       </div>
     </div>
 
-    <div class="pt-3 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
-      <span class="px-2 py-0.5 rounded bg-slate-900 border border-slate-800">${escapeHtml(card.sentimiento_mercado)}</span>
-      <span class="text-emerald-400 font-mono">Alta Asimetría</span>
+    <div class="pt-3 border-t border-slate-800 space-y-2.5">
+      <div class="text-[11px] text-slate-400 flex items-center justify-between">
+        <span class="px-2 py-0.5 rounded bg-slate-900 border border-slate-800">${escapeHtml(card.sentimiento_mercado)}</span>
+        <span class="text-emerald-400 font-mono font-bold">Alta Asimetría</span>
+      </div>
+      <button onclick="openInjectModalWithCardIndex(${oppIndex})" class="w-full py-1.5 px-3 rounded-lg bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/40 hover:border-emerald-400 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-[0_0_10px_rgba(16,185,129,0.15)] cursor-pointer">
+        <span>🚀</span>
+        <span>Inyectar ${escapeHtml(card.ticker)} a Trading Ollama</span>
+      </button>
     </div>
   `;
   return div;
@@ -742,6 +751,170 @@ function escapeHtml(text) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+// --- Puente de Inyección a Trading Ollama (Puerto 18767) ---
+
+function openInjectModal(card = null) {
+  const modal = document.getElementById('inject-modal');
+  if (!modal) return;
+
+  // Si no se pasó una tarjeta específica, buscar en el reporte activo
+  if (!card && currentActiveReport && currentActiveReport.oportunidades && currentActiveReport.oportunidades.length > 0) {
+    card = currentActiveReport.oportunidades[0];
+  }
+
+  let asset = "GENERAL";
+  let type = "Oportunidad";
+  let confidence = 85;
+  let text = "";
+  let marketStatus = "Verificando...";
+  let isMarketOpen = false;
+
+  if (card) {
+    asset = card.ticker || "GENERAL";
+    type = card.tipo === 'Trampa de Mercado / Peligro' ? 'Peligro' : 'Oportunidad';
+    confidence = Math.min(100, Math.max(0, Math.round((card.score_asimetria || 8) * 10)));
+    
+    // Armar directiva estructurada con tesis y parámetros operativos
+    const parts = [];
+    if (card.tesis_contrarian) parts.push(card.tesis_contrarian);
+    if (card.nivel_entrada_sugerido) parts.push(`Nivel entrada sugerido: ${card.nivel_entrada_sugerido}`);
+    if (card.stop_loss_sugerido) parts.push(`Stop Loss defensivo: ${card.stop_loss_sugerido}`);
+    if (card.target_proyectado) parts.push(`Target proyectado: ${card.target_proyectado}`);
+    if (card.horizonte_temporal) parts.push(`Horizonte: ${card.horizonte_temporal}`);
+    text = parts.join(". ");
+
+    if (card.horario_mercado) {
+      isMarketOpen = card.mercado_abierto;
+      marketStatus = isMarketOpen 
+        ? `🟢 ABIERTO (${card.horario_mercado})`
+        : `🔴 CERRADO (${card.horario_mercado} - Próxima apertura: ${card.proxima_apertura || 'oficial'})`;
+    }
+  } else if (currentActiveReport) {
+    const guia = currentActiveReport.guia_operador;
+    if (guia) {
+      text = guia.mensaje_principal || "Semáforo: ESPERAR / NO OPERAR. Sin asimetrías claras hoy.";
+      if (guia.ticker_referencia) asset = guia.ticker_referencia;
+      isMarketOpen = guia.mercado_abierto;
+      marketStatus = isMarketOpen 
+        ? `🟢 ABIERTO (${guia.horario_mercado || ''})`
+        : `🔴 CERRADO (${guia.horario_mercado || ''} - Próxima: ${guia.proxima_apertura || 'apertura'})`;
+      confidence = 90;
+    } else {
+      text = "Semáforo: ESPERAR / NO OPERAR. Disciplina de capital: mantener liquidez.";
+    }
+  }
+
+  if (!text) {
+    text = `Oportunidad identificada en ${asset}. Evaluar entrada según soporte técnico y gestión de riesgo.`;
+  }
+
+  // Cargar elementos en el Modal
+  const assetEl = document.getElementById('modal-inject-asset');
+  const typeEl = document.getElementById('modal-inject-type');
+  const confEl = document.getElementById('modal-inject-conf');
+  const mktEl = document.getElementById('modal-inject-market-status');
+  const textEl = document.getElementById('modal-inject-text');
+  const feedbackEl = document.getElementById('modal-inject-feedback');
+  const confirmBtn = document.getElementById('btn-modal-confirm-inject');
+  const confirmText = document.getElementById('modal-confirm-text');
+
+  if (assetEl) assetEl.innerText = asset;
+  if (typeEl) {
+    typeEl.innerText = type;
+    typeEl.className = type === 'Peligro' ? 'text-red-400 font-bold text-sm' : 'text-cyan-400 font-bold text-sm';
+  }
+  if (confEl) confEl.innerText = `${confidence}%`;
+  if (mktEl) {
+    mktEl.innerText = marketStatus;
+    mktEl.className = isMarketOpen ? 'font-bold text-emerald-400' : 'font-bold text-red-400';
+  }
+  if (textEl) textEl.value = text;
+  if (feedbackEl) {
+    feedbackEl.className = 'hidden text-xs p-3 rounded-lg font-mono';
+    feedbackEl.innerHTML = '';
+  }
+  if (confirmBtn) confirmBtn.disabled = false;
+  if (confirmText) confirmText.innerText = 'Confirmar e Inyectar';
+
+  currentInjectPayload = {
+    asset: asset,
+    text: text,
+    confidence: confidence,
+    type: type,
+    source: "Monitor de Mercado"
+  };
+
+  modal.classList.remove('hidden');
+}
+
+function openInjectModalWithCardIndex(idx) {
+  if (currentActiveReport && currentActiveReport.oportunidades && currentActiveReport.oportunidades[idx]) {
+    openInjectModal(currentActiveReport.oportunidades[idx]);
+  } else {
+    openInjectModal();
+  }
+}
+
+function closeInjectModal() {
+  const modal = document.getElementById('inject-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function confirmInjection() {
+  const textEl = document.getElementById('modal-inject-text');
+  const feedbackEl = document.getElementById('modal-inject-feedback');
+  const confirmBtn = document.getElementById('btn-modal-confirm-inject');
+  const confirmText = document.getElementById('modal-confirm-text');
+
+  if (!currentInjectPayload) return;
+  if (textEl) currentInjectPayload.text = textEl.value.trim();
+
+  if (confirmBtn) confirmBtn.disabled = true;
+  if (confirmText) confirmText.innerText = 'Transmitiendo a puerto 18767...';
+
+  try {
+    const res = await fetch('/api/inject_to_trading_bot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(currentInjectPayload)
+    });
+
+    const resData = await res.json().catch(() => ({}));
+
+    if (res.ok) {
+      if (feedbackEl) {
+        feedbackEl.className = 'text-xs p-3 rounded-lg font-mono bg-emerald-950/80 border border-emerald-500/60 text-emerald-200 block';
+        feedbackEl.innerHTML = `
+          <div class="font-bold flex items-center gap-1.5 text-emerald-300 mb-1">
+            <span>✅</span> ¡Directiva inyectada exitosamente a Trading Ollama!
+          </div>
+          <div>El bot recibió la tesis para <strong>${escapeHtml(currentInjectPayload.asset)}</strong> en su endpoint. Verifica su bitácora en vivo para ver la recepción.</div>
+        `;
+      }
+      if (confirmText) confirmText.innerText = '¡Inyectado con Éxito!';
+      setTimeout(() => {
+        closeInjectModal();
+      }, 2500);
+    } else {
+      throw new Error(resData.error || `Error HTTP ${res.status}`);
+    }
+  } catch (err) {
+    console.error("Error inyectando tesis a Trading Ollama:", err);
+    if (feedbackEl) {
+      feedbackEl.className = 'text-xs p-3 rounded-lg font-mono bg-amber-950/80 border border-amber-500/60 text-amber-200 block';
+      feedbackEl.innerHTML = `
+        <div class="font-bold flex items-center gap-1.5 text-amber-300 mb-1">
+          <span>⚠️</span> No se pudo contactar con Trading Ollama
+        </div>
+        <div class="leading-relaxed mt-1">${escapeHtml(err.message)}</div>
+        <div class="text-[11px] text-slate-400 mt-1">Asegúrate de que tu bot de trading esté ejecutándose en http://127.0.0.1:18767.</div>
+      `;
+    }
+    if (confirmBtn) confirmBtn.disabled = false;
+    if (confirmText) confirmText.innerText = 'Reintentar Inyección';
+  }
 }
 
 // Inicialización

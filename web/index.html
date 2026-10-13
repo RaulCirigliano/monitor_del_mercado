@@ -526,10 +526,16 @@
                 <span class="text-base">📢</span>
                 <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300">Instrucción Operativa para Hoy:</h4>
               </div>
-              <button id="btn-copy-macro" onclick="copyMacroInstruction()" class="px-2.5 py-1 rounded bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-700/60 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all cursor-pointer">
-                <span>📋</span>
-                <span id="copy-macro-text">Copiar para Contexto Macro</span>
-              </button>
+              <div class="flex items-center gap-2 flex-wrap">
+                <button id="btn-copy-macro" onclick="copyMacroInstruction()" class="px-2.5 py-1.5 rounded-lg bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-700/60 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all cursor-pointer">
+                  <span>📋</span>
+                  <span id="copy-macro-text">Copiar para Contexto Macro</span>
+                </button>
+                <button id="btn-inject-macro" onclick="openInjectModal()" class="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-400 text-white font-bold text-xs shadow-[0_0_15px_rgba(16,185,129,0.35)] border border-emerald-400/50 flex items-center gap-1.5 transition-all cursor-pointer transform hover:scale-[1.02] active:scale-[0.98]">
+                  <span>🚀</span>
+                  <span>INYECTAR TESIS A TRADING OLLAMA</span>
+                </button>
+              </div>
             </div>
             <p id="operator-main-message" class="text-sm text-white font-medium leading-relaxed pl-3 border-l-2 border-cyan-500">
               Cargando hoja de ruta operativa...
@@ -611,6 +617,86 @@
   <footer class="border-t border-slate-800/80 bg-[#0d131f] text-slate-500 text-xs py-4 px-6 text-center">
     Monitor del Mercado — Sistema 100% Independiente de Investigación Financiera y Asimetría Contrarian.
   </footer>
+
+  <!-- Modal: Inyectar Directiva a Trading Ollama -->
+  <div id="inject-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
+    <div class="bg-slate-900 border border-cyan-500/50 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 text-slate-200 animate-in fade-in zoom-in-95 duration-150">
+      
+      <!-- Encabezado Modal -->
+      <div class="flex items-start justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-cyan-950/80 border border-cyan-500/40 flex items-center justify-center text-lg">
+            📡
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white tracking-wide">Puente Táctico: Inyectar Directiva a Trading Ollama</h3>
+            <p class="text-[11px] text-cyan-400/80 font-mono">Destino: http://127.0.0.1:18767/api/macro/inject</p>
+          </div>
+        </div>
+        <button onclick="closeInjectModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors text-lg leading-none cursor-pointer">✕</button>
+      </div>
+
+      <!-- Resumen de Carga Útil (Payload) -->
+      <div class="space-y-3 text-xs">
+        <div class="grid grid-cols-3 gap-2 font-mono">
+          <div class="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+            <span class="text-slate-400 block text-[10px]">Activo / Ticker</span>
+            <span id="modal-inject-asset" class="text-emerald-400 font-bold text-sm">TLT</span>
+          </div>
+          <div class="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+            <span class="text-slate-400 block text-[10px]">Tipo de Señal</span>
+            <span id="modal-inject-type" class="text-cyan-400 font-bold text-sm">Oportunidad</span>
+          </div>
+          <div class="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+            <span class="text-slate-400 block text-[10px]">Confianza / Score</span>
+            <span id="modal-inject-conf" class="text-amber-400 font-bold text-sm">85%</span>
+          </div>
+        </div>
+
+        <!-- Estado de Mercado del Activo -->
+        <div id="modal-inject-market-banner" class="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 text-[11px] flex items-center justify-between font-mono">
+          <span class="text-slate-400">Estado Mercado:</span>
+          <span id="modal-inject-market-status" class="font-bold text-slate-300">Verificando...</span>
+        </div>
+
+        <!-- Vista Previa de la Directiva que se Inyectará -->
+        <div class="space-y-1">
+          <div class="flex justify-between items-center text-[11px]">
+            <span class="text-slate-400 font-semibold">Tesis & Contexto Macro a Transmitir:</span>
+            <span class="text-slate-500 font-mono text-[10px]">JSON Payload</span>
+          </div>
+          <textarea id="modal-inject-text" rows="4" class="w-full bg-slate-950 border border-slate-700/80 rounded-lg p-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500 leading-relaxed"></textarea>
+        </div>
+
+        <!-- Explicación Didáctica -->
+        <div class="p-3 rounded-lg bg-cyan-950/20 border border-cyan-800/40 text-[11px] text-cyan-200/90 leading-relaxed space-y-1">
+          <div class="font-bold flex items-center gap-1.5 text-cyan-300">
+            <span>ℹ️</span> ¿Qué ocurrirá al confirmar?
+          </div>
+          <p class="text-slate-300">
+            1. Se enviará este paquete vía POST al endpoint de <strong>Trading Ollama</strong>.<br>
+            2. Tu bot de trading registrará en su bitácora: <em>"🌐 [MONITOR DEL MERCADO] Directiva recibida..."</em>.<br>
+            3. La tarjeta se dibujará en su <strong>Radar de Oportunidades</strong> y se cargará en su <strong>Contexto Macro</strong> para que Qwen lo evalúe con datos en vivo.
+          </p>
+        </div>
+
+        <!-- Feedback de Envío (Alertas de Éxito / Error) -->
+        <div id="modal-inject-feedback" class="hidden text-xs p-3 rounded-lg font-mono"></div>
+      </div>
+
+      <!-- Acciones -->
+      <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+        <button onclick="closeInjectModal()" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer">
+          Cancelar
+        </button>
+        <button id="btn-modal-confirm-inject" onclick="confirmInjection()" class="px-5 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-bold text-xs shadow-[0_0_15px_rgba(16,185,129,0.4)] border border-emerald-400/50 flex items-center gap-2 transition-all cursor-pointer">
+          <span>🚀</span>
+          <span id="modal-confirm-text">Confirmar e Inyectar</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
 
   <script src="/app.js"></script>
 </body>

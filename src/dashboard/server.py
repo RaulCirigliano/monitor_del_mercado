@@ -187,6 +187,43 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._set_headers(500)
                 self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+
+        elif parsed.path == "/api/inject_to_trading_bot":
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length) if length > 0 else b"{}"
+            try:
+                data = json.loads(body.decode("utf-8"))
+            except Exception:
+                data = {}
+
+            # Reenvío directo a Trading Ollama en http://127.0.0.1:18767/api/macro/inject
+            import urllib.request
+            import urllib.error
+
+            target_url = "http://127.0.0.1:18767/api/macro/inject"
+            req_data = json.dumps(data).encode("utf-8")
+            req = urllib.request.Request(
+                target_url,
+                data=req_data,
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+
+            try:
+                with urllib.request.urlopen(req, timeout=4) as response:
+                    res_body = response.read().decode("utf-8")
+                    self._set_headers(response.status)
+                    self.wfile.write(res_body.encode("utf-8"))
+            except urllib.error.URLError as e:
+                self._set_headers(502)
+                err_msg = (
+                    "No se pudo conectar con Trading Ollama en http://127.0.0.1:18767. "
+                    "Verifica que el bot de trading esté iniciado y escuchando en el puerto 18767."
+                )
+                self.wfile.write(json.dumps({"error": err_msg, "detail": str(e)}).encode("utf-8"))
+            except Exception as e:
+                self._set_headers(500)
+                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
         else:
             self._set_headers(404)
             self.wfile.write(b'{"error": "Ruta no encontrada"}')
