@@ -356,13 +356,20 @@
         </div>
 
         <!-- Banner de Estado de Vigencia y Modo del Reporte Activo -->
-        <div id="report-vigencia-banner" class="hidden p-2 rounded-lg bg-slate-950/70 border border-slate-800 text-xs font-mono flex flex-wrap items-center justify-between gap-2">
+        <div id="report-vigencia-banner" class="hidden p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 text-xs font-mono flex flex-wrap items-center justify-between gap-2">
           <div class="flex flex-wrap items-center gap-2">
+            <span class="text-slate-400 font-bold">Viendo:</span>
+            <span id="report-active-title" class="text-white font-bold px-2 py-0.5 rounded bg-slate-900 border border-slate-700"></span>
             <span id="report-vigencia-badge" class="px-2 py-0.5 rounded text-[11px] font-bold"></span>
             <span id="report-mode-badge" class="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300 text-[11px]"></span>
             <span id="report-folder-badge" class="text-slate-400 text-[11px]"></span>
+            <span id="report-age-text" class="text-slate-400 text-[11px]"></span>
           </div>
-          <span id="report-age-text" class="text-slate-400 text-[11px]"></span>
+          <div class="flex items-center gap-2">
+            <button id="btn-delete-report" onclick="deleteActiveReport()" class="px-2.5 py-1 rounded bg-red-950/80 hover:bg-red-900 text-red-300 border border-red-700/60 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer" title="Eliminar este informe del disco">
+              <span>🗑️</span> Borrar Este Informe
+            </button>
+          </div>
         </div>
       </div>
 

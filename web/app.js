@@ -23,6 +23,7 @@ async function fetchStatus() {
 
 let allReportsCache = [];
 let currentReportsTab = 'vigentes';
+let activeReportPath = null;
 let radarTimerInterval = null;
 let radarCountdownSeconds = 0;
 
@@ -53,22 +54,35 @@ function renderReportsListButtons() {
   if (!listToRender || listToRender.length === 0) {
     const msg = currentReportsTab === 'vigentes'
       ? 'No hay reportes vigentes de las últimas 48h. Haz clic en "Historial Completo" para ver anteriores.'
-      : 'No hay reportes generados aún.';
-    container.innerHTML = `<span class="text-slate-500 italic text-xs">${msg}</span>`;
+      : 'No hay reportes generados aún en el historial.';
+    container.innerHTML = `<span class="text-slate-500 italic text-xs py-1">${msg}</span>`;
     return;
   }
 
   listToRender.forEach(r => {
+    const targetKey = r.rel_path || r.name;
+    const isSelected = activeReportPath && (
+      activeReportPath === targetKey ||
+      activeReportPath.endsWith(r.name) ||
+      targetKey.endsWith(activeReportPath)
+    );
+
     const btn = document.createElement('button');
+    btn.setAttribute('data-path', targetKey);
     const isVigenteDot = r.es_vigente
       ? '<span class="w-2 h-2 rounded-full bg-emerald-400 inline-block shadow-[0_0_6px_rgba(52,211,153,0.8)]"></span>'
       : '<span class="w-2 h-2 rounded-full bg-slate-600 inline-block"></span>';
     const modeIcon = r.modo === 'BUSQUEDA_ESPECIFICA' ? '🎯' : '🛰️';
     const folderLabel = r.date_folder && r.date_folder !== 'General' ? `[${r.date_folder}] ` : '';
+    const ageLabel = r.horas_antiguedad !== undefined ? ` (${r.horas_antiguedad}h)` : '';
 
-    btn.className = 'px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/60 transition-colors cursor-pointer flex items-center gap-1.5 text-xs';
-    btn.innerHTML = `${isVigenteDot} <span>${modeIcon} ${escapeHtml(folderLabel + r.name)}</span>`;
-    btn.onclick = () => loadReportContent(r.rel_path || r.name, btn);
+    const baseClass = isSelected
+      ? 'px-3 py-1.5 rounded-lg bg-cyan-950 text-cyan-300 border border-cyan-500 font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs shadow-[0_0_10px_rgba(6,182,212,0.3)]'
+      : 'px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/60 transition-colors cursor-pointer flex items-center gap-1.5 text-xs';
+
+    btn.className = baseClass;
+    btn.innerHTML = `${isVigenteDot} <span>${modeIcon} ${escapeHtml(folderLabel + r.name)}${ageLabel}</span>`;
+    btn.onclick = () => loadReportContent(targetKey, btn);
     container.appendChild(btn);
   });
 }
@@ -95,10 +109,15 @@ async function loadLatestReport() {
     const res = await fetch('/api/reports/latest');
     if (!res.ok) {
       document.getElementById('executive-verdict').innerText = "No se ha generado ningún reporte todavía. Haz clic en 'Escanear Mercado Ahora'.";
+      const banner = document.getElementById('report-vigencia-banner');
+      if (banner) banner.classList.add('hidden');
       return;
     }
     const reportData = await res.json();
+    activeReportPath = reportData.rel_path || reportData.name;
     renderReport(reportData);
+    updateReportBanner(reportData);
+    highlightActiveButton(activeReportPath);
   } catch (err) {
     console.error("Error cargando último reporte:", err);
   }
@@ -106,53 +125,16 @@ async function loadLatestReport() {
 
 async function loadReportContent(targetPath, clickedBtn = null) {
   try {
-    // Marcar botón activo
-    if (clickedBtn) {
-      document.querySelectorAll('#reports-list button').forEach(b => {
-        b.classList.remove('bg-cyan-950', 'border-cyan-500', 'text-cyan-300');
-        b.classList.add('bg-slate-900', 'text-slate-300');
-      });
-      clickedBtn.classList.remove('bg-slate-900', 'text-slate-300');
-      clickedBtn.classList.add('bg-cyan-950', 'border-cyan-500', 'text-cyan-300');
-    }
+    activeReportPath = targetPath;
+    highlightActiveButton(targetPath);
 
     const res = await fetch(`/api/reports/${encodeURIComponent(targetPath)}`);
+    if (!res.ok) {
+      throw new Error(`Reporte no encontrado (${res.status})`);
+    }
     const reportData = await res.json();
     renderReport(reportData);
-
-    // Banner de vigencia y modo
-    const banner = document.getElementById('report-vigencia-banner');
-    const vigBadge = document.getElementById('report-vigencia-badge');
-    const modeBadge = document.getElementById('report-mode-badge');
-    const folderBadge = document.getElementById('report-folder-badge');
-    const ageText = document.getElementById('report-age-text');
-
-    if (banner && vigBadge) {
-      banner.classList.remove('hidden');
-      if (reportData.es_vigente) {
-        vigBadge.className = 'px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800';
-        vigBadge.innerText = '🟢 VIGENTE (Activo)';
-      } else {
-        vigBadge.className = 'px-2 py-0.5 rounded text-[11px] font-bold bg-slate-900 text-slate-400 border border-slate-700';
-        vigBadge.innerText = '⚪ HISTÓRICO (Caducado)';
-      }
-
-      if (modeBadge) {
-        modeBadge.innerText = reportData.modo_escaneo === 'BUSQUEDA_ESPECIFICA'
-          ? '🎯 Búsqueda Específica'
-          : '🛰️ Radar Autónomo';
-      }
-
-      if (folderBadge) {
-        folderBadge.innerText = `Carpeta: ${reportData.date_folder || 'Raíz'}`;
-      }
-
-      if (ageText) {
-        ageText.innerText = reportData.horas_antiguedad !== undefined
-          ? `Emitido hace ${reportData.horas_antiguedad} h`
-          : '';
-      }
-    }
+    updateReportBanner(reportData);
 
     // Desplazamiento suave directo hacia las Conclusiones Internas
     const box = document.getElementById('conclusions-box');
@@ -165,6 +147,93 @@ async function loadReportContent(targetPath, clickedBtn = null) {
     }
   } catch (err) {
     console.error("Error cargando reporte:", err);
+    alert("Error al cargar el contenido del informe: " + err.message);
+  }
+}
+
+function updateReportBanner(reportData) {
+  const banner = document.getElementById('report-vigencia-banner');
+  const titleEl = document.getElementById('report-active-title');
+  const vigBadge = document.getElementById('report-vigencia-badge');
+  const modeBadge = document.getElementById('report-mode-badge');
+  const folderBadge = document.getElementById('report-folder-badge');
+  const ageText = document.getElementById('report-age-text');
+
+  if (banner) {
+    banner.classList.remove('hidden');
+    if (titleEl) {
+      titleEl.innerText = reportData.name || 'Reporte';
+    }
+    if (vigBadge) {
+      if (reportData.es_vigente) {
+        vigBadge.className = 'px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800';
+        vigBadge.innerText = '🟢 VIGENTE (Activo)';
+      } else {
+        vigBadge.className = 'px-2 py-0.5 rounded text-[11px] font-bold bg-slate-900 text-slate-400 border border-slate-700';
+        vigBadge.innerText = '⚪ HISTÓRICO (Caducado)';
+      }
+    }
+
+    if (modeBadge) {
+      modeBadge.innerText = reportData.modo_escaneo === 'BUSQUEDA_ESPECIFICA'
+        ? '🎯 Búsqueda Específica'
+        : '🛰️ Radar Autónomo';
+    }
+
+    if (folderBadge) {
+      folderBadge.innerText = `Carpeta: ${reportData.date_folder || 'Raíz'}`;
+    }
+
+    if (ageText) {
+      ageText.innerText = reportData.horas_antiguedad !== undefined
+        ? `Emitido hace ${reportData.horas_antiguedad} h`
+        : '';
+    }
+  }
+}
+
+function highlightActiveButton(targetPath) {
+  if (!targetPath) return;
+  document.querySelectorAll('#reports-list button').forEach(b => {
+    const btnPath = b.getAttribute('data-path');
+    if (btnPath && (btnPath === targetPath || btnPath.endsWith(targetPath) || targetPath.endsWith(btnPath))) {
+      b.className = 'px-3 py-1.5 rounded-lg bg-cyan-950 text-cyan-300 border border-cyan-500 font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs shadow-[0_0_10px_rgba(6,182,212,0.3)]';
+    } else {
+      b.className = 'px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/60 transition-colors cursor-pointer flex items-center gap-1.5 text-xs';
+    }
+  });
+}
+
+async function deleteActiveReport() {
+  if (!activeReportPath) {
+    alert("No hay ningún informe seleccionado para eliminar.");
+    return;
+  }
+
+  const titleEl = document.getElementById('report-active-title');
+  const displayName = titleEl ? titleEl.innerText : activeReportPath;
+
+  const confirmed = confirm(
+    `¿Estás seguro de que deseas eliminar permanentemente el informe "${displayName}"?\n\nEsta acción borrará el archivo físico del disco.`
+  );
+  if (!confirmed) return;
+
+  try {
+    const res = await fetch(`/api/reports/${encodeURIComponent(activeReportPath)}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || `Error ${res.status}`);
+    }
+
+    alert(`El informe "${displayName}" fue eliminado exitosamente.`);
+    activeReportPath = null;
+    await loadReportsList();
+    await loadLatestReport();
+  } catch (err) {
+    console.error("Error eliminando reporte:", err);
+    alert("No se pudo eliminar el informe: " + err.message);
   }
 }
 

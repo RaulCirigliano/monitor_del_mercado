@@ -21,8 +21,15 @@ def parse_markdown_report(report_path: Path) -> Dict[str, Any]:
     # Modo de escaneo
     modo_escaneo = "BUSQUEDA_ESPECIFICA" if report_path.name.startswith("ESPECIFICO_") else "RADAR_AUTONOMO"
 
+    try:
+        from config import settings
+        rel_path = str(report_path.relative_to(settings.reports_dir))
+    except Exception:
+        rel_path = report_path.name
+
     result: Dict[str, Any] = {
         "name": report_path.name,
+        "rel_path": rel_path,
         "date_folder": report_path.parent.name if report_path.parent.name != "reportes" else "General",
         "timestamp": "",
         "modo_escaneo": modo_escaneo,

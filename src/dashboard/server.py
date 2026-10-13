@@ -21,7 +21,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", f"{content_type}; charset=utf-8")
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, DELETE")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
@@ -187,6 +187,47 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._set_headers(500)
                 self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+        else:
+            self._set_headers(404)
+            self.wfile.write(b'{"error": "Ruta no encontrada"}')
+
+    def do_DELETE(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        if path.startswith("/api/reports/"):
+            from urllib.parse import unquote
+            rel_path = unquote(path.replace("/api/reports/", "")).strip("/")
+            target_file = (settings.reports_dir / rel_path).resolve()
+
+            # Fallback si se pasa solo el nombre de archivo
+            if not target_file.exists() or not target_file.is_file():
+                filename = Path(rel_path).name
+                matches = list(settings.reports_dir.rglob(filename))
+                if matches:
+                    target_file = matches[0]
+
+            if not target_file.exists() or not target_file.is_file():
+                self._set_headers(404)
+                self.wfile.write(json.dumps({"error": f"Reporte '{rel_path}' no encontrado"}).encode("utf-8"))
+                return
+
+            try:
+                parent_dir = target_file.parent
+                deleted_name = target_file.name
+                target_file.unlink()
+
+                # Si el directorio de fecha queda vacío, eliminarlo limpiamente
+                if parent_dir != settings.reports_dir and not any(parent_dir.iterdir()):
+                    try:
+                        parent_dir.rmdir()
+                    except Exception:
+                        pass
+
+                self._set_headers(200)
+                self.wfile.write(json.dumps({"success": True, "deleted": deleted_name}).encode("utf-8"))
+            except Exception as e:
+                self._set_headers(500)
+                self.wfile.write(json.dumps({"error": f"Error al borrar reporte: {e}"}).encode("utf-8"))
         else:
             self._set_headers(404)
             self.wfile.write(b'{"error": "Ruta no encontrada"}')
