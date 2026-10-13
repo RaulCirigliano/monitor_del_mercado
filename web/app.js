@@ -659,6 +659,13 @@ async function triggerScan(isAutomatic = false) {
     const result = await res.json();
     await loadReportsList();
     await loadLatestReport();
+
+    // Auto-transmisión desatendida a Trading Ollama si la casilla está activa
+    const autoinjectEl = document.getElementById('radar-autoinject');
+    if (autoinjectEl && autoinjectEl.checked && currentActiveReport) {
+      await autoInjectReport(currentActiveReport, isAutomatic);
+    }
+
     if (!isAutomatic) {
       alert("¡Escaneo completado con éxito! Se han actualizado las fichas y conclusiones.");
     } else {
@@ -914,6 +921,70 @@ async function confirmInjection() {
     }
     if (confirmBtn) confirmBtn.disabled = false;
     if (confirmText) confirmText.innerText = 'Reintentar Inyección';
+  }
+}
+
+async function autoInjectReport(report, isAutomatic = false) {
+  if (!report) return;
+
+  let asset = "GENERAL";
+  let type = "Oportunidad";
+  let confidence = 85;
+  let text = "";
+
+  if (report.oportunidades && report.oportunidades.length > 0) {
+    const opp = report.oportunidades[0];
+    asset = opp.ticker || "GENERAL";
+    type = opp.tipo === 'Trampa de Mercado / Peligro' ? 'Peligro' : 'Oportunidad';
+    confidence = Math.min(100, Math.max(0, Math.round((opp.score_asimetria || 8) * 10)));
+    text = (report.guia_operador && report.guia_operador.mensaje_principal) || opp.tesis_contrarian;
+  } else {
+    asset = (report.guia_operador && report.guia_operador.ticker_referencia) || "GENERAL";
+    type = "Oportunidad";
+    confidence = 80;
+    text = (report.guia_operador && report.guia_operador.mensaje_principal) || "Semáforo: ESPERAR / NO OPERAR. Disciplina de capital: mantener liquidez.";
+  }
+
+  const payload = {
+    asset: asset,
+    text: text,
+    confidence: confidence,
+    type: type,
+    source: isAutomatic ? "Monitor de Mercado (Radar Continuo)" : "Monitor de Mercado"
+  };
+
+  const statusEl = document.getElementById('radar-autoinject-status');
+
+  try {
+    const res = await fetch('/api/inject_to_trading_bot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      console.log(`📡 [AUTO-INYECCIÓN] Directiva transmitida exitosamente a Trading Ollama para ${asset}.`);
+      if (statusEl) {
+        statusEl.className = "text-[10px] text-emerald-400 font-mono px-2 py-0.5 rounded bg-emerald-950/90 border border-emerald-800/80 flex items-center gap-1.5 animate-pulse";
+        statusEl.innerHTML = `<span>📡</span> Transmitido a Trading Ollama: <strong>${escapeHtml(asset)}</strong>`;
+        statusEl.classList.remove('hidden');
+        setTimeout(() => {
+          if (statusEl) statusEl.classList.add('hidden');
+        }, 8000);
+      }
+    } else {
+      console.warn("Auto-inyección falló (puerto 18767 desconectado):", res.status);
+      if (statusEl) {
+        statusEl.className = "text-[10px] text-amber-400 font-mono px-2 py-0.5 rounded bg-amber-950/90 border border-amber-800/80 flex items-center gap-1.5";
+        statusEl.innerHTML = `<span>⚠️</span> Puerto 18767 desconectado`;
+        statusEl.classList.remove('hidden');
+        setTimeout(() => {
+          if (statusEl) statusEl.classList.add('hidden');
+        }, 8000);
+      }
+    }
+  } catch (err) {
+    console.warn("Error en auto-inyección a Trading Ollama:", err);
   }
 }
 

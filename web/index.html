@@ -140,10 +140,22 @@
             </span>
             <select id="radar-interval" onchange="toggleContinuousRadar()" class="bg-slate-900 text-slate-300 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-cyan-500 outline-none">
               <option value="0">Desactivado (Escaneo Manual)</option>
+              <option value="15">Escanear cada 15 minutos</option>
               <option value="30">Escanear cada 30 minutos</option>
               <option value="60">Escanear cada 60 minutos</option>
               <option value="120">Escanear cada 2 horas</option>
             </select>
+          </div>
+
+          <!-- Checkbox de Auto-transmisión a Trading Ollama -->
+          <div class="flex items-center gap-3 flex-wrap">
+            <label class="flex items-center gap-2 cursor-pointer select-none text-slate-300 hover:text-cyan-300 transition-colors">
+              <input type="checkbox" id="radar-autoinject" checked class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-cyan-500 focus:ring-0 cursor-pointer">
+              <span class="font-medium text-xs">📡 Auto-transmitir a Trading Ollama al finalizar</span>
+            </label>
+            <div id="radar-autoinject-status" class="hidden text-[10px] text-emerald-400 font-mono px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-800/60">
+              Directiva transmitida
+            </div>
           </div>
 
           <div id="radar-countdown-badge" class="hidden items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-950/70 border border-cyan-800/70 text-cyan-300 font-mono text-[11px]">
