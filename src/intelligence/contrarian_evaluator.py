@@ -10,6 +10,7 @@ from src.models import (
     AnalysisBatch,
     GuiaOperador,
 )
+from src.ingestion.market_schedule import MarketSchedule
 
 from src.intelligence.ollama_client import OllamaClient
 from src.intelligence.gemini_client import GeminiClient
@@ -133,11 +134,17 @@ class ContrarianEvaluator:
                 timeout=self.STEP_TIMEOUT,
             )
             card = OpportunityCard.model_validate(data)
+            sch = MarketSchedule.check_status(ticker)
+            card.horario_mercado = sch.get("horario_argentina")
+            card.mercado_abierto = sch.get("mercado_abierto")
+            card.proxima_apertura = sch.get("proxima_apertura")
+            card.categoria_mercado = sch.get("categoria")
             return card
         except Exception as e:
             logger.warning(f"Error generando ficha detallada para {ticker}: {e}")
             # Si falla la generación detallada, construir una ficha de síntesis basada en datos duros
             if snapshot and snapshot.current_price:
+                sch = MarketSchedule.check_status(ticker)
                 return OpportunityCard(
                     ticker=ticker,
                     asset_name=ticker,
@@ -153,6 +160,10 @@ class ContrarianEvaluator:
                     horizonte_temporal="3-6 meses",
                     score_asimetria=7,
                     fuentes_relacionadas=["Métricas técnicas de mercado"],
+                    horario_mercado=sch.get("horario_argentina"),
+                    mercado_abierto=sch.get("mercado_abierto"),
+                    proxima_apertura=sch.get("proxima_apertura"),
+                    categoria_mercado=sch.get("categoria"),
                 )
             return None
 
@@ -238,53 +249,93 @@ class ContrarianEvaluator:
         dangers: List[OpportunityCard],
         custom_directive: Optional[str] = None,
     ) -> GuiaOperador:
-        """Construye una hoja de ruta con instrucciones paso a paso en lenguaje 100% accesible para un operador novato."""
+        """Construye una hoja de ruta con instrucciones paso a paso y verificación de horarios de mercado en tiempo real."""
         if opportunities:
             opp = opportunities[0]
             ticker = opp.ticker
             entry = opp.nivel_entrada_sugerido
             stop = opp.stop_loss_sugerido or "5% por debajo del precio de entrada"
             target = opp.target_proyectado or "15% a 20% por encima de la entrada"
+            sch = MarketSchedule.check_status(ticker)
+
+            if sch["mercado_abierto"]:
+                mensaje_horario = (
+                    f"🟢 MERCADO ABIERTO EN VIVO ({sch['categoria']}): "
+                    f"Horario oficial {sch['horario_argentina']}. "
+                    f"El mercado recibe volumen y velas frescas; puedes enviar órdenes u operar con tu bot en tiempo real."
+                )
+                paso1 = f"1. LOCALIZA EL ACTIVO ({sch['estado_texto']}): Abre tu broker o plataforma. El mercado para '{ticker}' ({opp.asset_name}) está ABIERTO ({sch['horario_argentina']}) con liquidez viva."
+                paso2 = f"2. ORDEN DE COMPRA (NO COMPRES A CUALQUIER PRECIO): Configura una orden límite en la zona de {entry}. No compres a mercado apresuradamente; espera que el precio venga a ti."
+            else:
+                mensaje_horario = (
+                    f"⚠️ ATENCIÓN HORARIO ({sch['estado_texto']}): "
+                    f"El mercado físico de {ticker} ({sch['categoria']}) opera de {sch['horario_argentina']}. "
+                    f"Actualmente está CERRADO. No dispares órdenes a tu bot de trading ahora para evitar rechazos por datos obsoletos y riesgo de salto de precio (gap). "
+                    f"Deja preparada tu tesis en el contexto macro y ejecuta a partir de la apertura: {sch['proxima_apertura']}."
+                )
+                paso1 = (
+                    f"1. ESPERA A LA APERTURA ({sch['estado_texto']}): El mercado de {ticker} opera de {sch['horario_argentina']}. "
+                    f"Actualmente está cerrado. Próxima apertura operativa: {sch['proxima_apertura']}."
+                )
+                paso2 = (
+                    f"2. PREPARA TU TESIS EN EL BOT O BROKER: Puedes dejar configurada tu orden límite en {entry} o cargada la tesis macro, "
+                    f"pero mantén la orden en pausa hasta las {sch['proxima_apertura']} para que gatille con cotizaciones en vivo."
+                )
 
             pasos = [
-                f"1. LOCALIZA EL ACTIVO: Abre tu plataforma de inversión y busca el ticker '{ticker}' ({opp.asset_name}).",
-                f"2. ORDEN DE COMPRA (NO COMPRES A CUALQUIER PRECIO): Configura una 'orden límite' en la zona de {entry}. No compres a mercado apresuradamente; espera que el precio venga a ti.",
+                paso1,
+                paso2,
                 f"3. PROTEGE TU CAPITAL (STOP LOSS OBLIGATORIO): En el mismo instante que se ejecute la compra, coloca tu orden de venta defensiva (Stop Loss) en {stop}. Este es tu cinturón de seguridad: si el precio cae a ese punto, se vende automáticamente para que tu pérdida sea pequeña y controlada.",
                 f"4. PLANIFICA TU GANANCIA (TAKE PROFIT): Programa una orden de toma de ganancias en {target}. Si el precio alcanza ese objetivo, retira beneficios sin codicia.",
                 f"5. MONITOREA SIN ANSIEDAD: El horizonte estimado es de {opp.horizonte_temporal}. No mires el gráfico cada 5 minutos; dale tiempo a la tesis para desarrollarse.",
             ]
 
+            mensaje_base = f"Existe una oportunidad de inversión asimétrica favorable en {ticker}. La multitud está asustada y vendiendo, lo que te permite comprar a un precio castigado arriesgando poco para ganar el triple."
+
             return GuiaOperador(
                 estado_semaforo="OPERAR CON CAUTELA",
-                mensaje_principal=f"Existe una oportunidad de inversión asimétrica favorable en {ticker}. La multitud está asustada y vendiendo, lo que te permite comprar a un precio castigado arriesgando poco para ganar el triple.",
+                mensaje_principal=f"{mensaje_base} {mensaje_horario}",
                 checklist_pasos=pasos,
                 regla_gestion_riesgo="REGLA DEL 1%: Nunca arriesgues más del 1% o 2% de todo el dinero de tu cuenta en esta operación. Por ejemplo, si tienes 1.000 USD, tu pérdida máxima permitida en el Stop Loss no debe superar los 10 a 20 USD.",
                 consejo_psicologico="Si ves titulares en los diarios diciendo que todo se va a derrumbar respecto a este activo, mantén la calma. El pánico de los medios es el causante del descuento. Tu ventaja como inversor contrarian es comprar cuando hay sangre y vender cuando hay fiesta.",
+                horario_mercado=sch["horario_argentina"],
+                mercado_abierto=sch["mercado_abierto"],
+                proxima_apertura=sch["proxima_apertura"],
+                categoria_mercado=sch["categoria"],
+                recomendacion_horaria=sch["recomendacion_horaria"],
             )
 
         elif dangers:
             danger = dangers[0]
             ticker = danger.ticker
+            sch = MarketSchedule.check_status(ticker)
+
             pasos = [
                 f"1. ALTO TOTAL: No compres '{ticker}' ({danger.asset_name}) bajo ninguna circunstancia.",
                 "2. NO TE DEJES LLEVAR POR EL FOMO (Miedo a Quedar Fuera): Aunque todos en redes sociales o noticias digan que va a subir sin parar, el precio ya está inflado.",
-                "3. SI YA TIENES ESTE ACTIVO: Considera vender una parte para asegurar ganancias o ajustar un Stop Loss ceñido.",
+                f"3. HORARIO DE REFERENCIA ({sch['estado_texto']}): Este activo cotiza en {sch['horario_argentina']}. Si ya posees posición, evalúa tomar beneficios en horario de mercado activo.",
                 "4. CONSERVA TU LIQUIDEZ: Tu dinero está más seguro en tu cuenta esperando una verdadera caída que arriesgándolo en un techo.",
             ]
             return GuiaOperador(
                 estado_semaforo="ALERTA DE PELIGRO",
-                mensaje_principal=f"El activo {ticker} está en zona de euforia mediática peligrosa. Los inversores novatos están entrando por codicia y los grandes fondos los utilizarán como liquidez para venderles caro.",
+                mensaje_principal=f"El activo {ticker} está en zona de euforia mediática peligrosa ({sch['categoria']}). Los inversores novatos están entrando por codicia y los grandes fondos los utilizarán como liquidez para venderles caro.",
                 checklist_pasos=pasos,
                 regla_gestion_riesgo="PRESERVACIÓN DE CAPITAL: El primer objetivo de un operador novato no es hacerse rico rápido, sino evitar perder el dinero en las trampas de euforia.",
                 consejo_psicologico="Sentirás ganas de comprar porque 'todo el mundo habla de ello'. Esa es la trampa psicológica más antigua del mercado. Recuerda: compra en el pánico, huye de la euforia.",
+                horario_mercado=sch["horario_argentina"],
+                mercado_abierto=sch["mercado_abierto"],
+                proxima_apertura=sch["proxima_apertura"],
+                categoria_mercado=sch["categoria"],
+                recomendacion_horaria=sch["recomendacion_horaria"],
             )
 
         else:
+            sch_general = MarketSchedule.check_status("SPY")
             pasos = [
                 "1. QUÉDATE QUIETO: Hoy no toques ningún botón de compra ni de venta.",
                 "2. CONSERVA EL 100% DE TU DINERO EN EFECTIVO: El 95% de las noticias de hoy fueron descartadas como ruido publicitario o chismes sin fundamento.",
                 "3. EVITA EL ERROR N° 1 DEL NOVATO: El error más común es operar todos los días por aburrimiento o impaciencia. Los traders profesionales pasan el 80% de su tiempo observando y esperando.",
-                "4. ESPERA AL PRÓXIMO ESCANEO: Mantén el radar activo y espera a que el mercado ofrezca una verdadera capitulación con ventaja matemática.",
+                f"4. ESPERA AL PRÓXIMO ESCANEO: Mantén el radar activo. Horario central de Wall Street: {sch_general['horario_argentina']}.",
             ]
             return GuiaOperador(
                 estado_semaforo="ESPERAR / NO OPERAR",
@@ -292,6 +343,11 @@ class ContrarianEvaluator:
                 checklist_pasos=pasos,
                 regla_gestion_riesgo="PACIENCIA Y DISCIPLINA: No perder dinero en días de ruido es exactamente igual a ganar dinero. El efectivo es una posición ganadora.",
                 consejo_psicologico="No sientas que estás perdiendo el tiempo por no hacer una operación hoy. La disciplina de esperar a que el precio y el pánico jueguen a tu favor es lo que separa a los perdedores de los inversores exitosos.",
+                horario_mercado=sch_general["horario_argentina"],
+                mercado_abierto=sch_general["mercado_abierto"],
+                proxima_apertura=sch_general["proxima_apertura"],
+                categoria_mercado=sch_general["categoria"],
+                recomendacion_horaria=sch_general["recomendacion_horaria"],
             )
 
 

@@ -129,8 +129,21 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self._set_headers(404)
                 self.wfile.write(json.dumps({"error": f"No se encontraron datos para {symbol}"}).encode("utf-8"))
                 return
+
+            from src.ingestion.market_schedule import MarketSchedule
+            sch = MarketSchedule.check_status(symbol)
+            snap_dict = snap.model_dump()
+            snap_dict["schedule"] = sch
+
             self._set_headers(200)
-            self.wfile.write(snap.model_dump_json().encode("utf-8"))
+            self.wfile.write(json.dumps(snap_dict).encode("utf-8"))
+            return
+
+        elif path == "/api/market-hours":
+            from src.ingestion.market_schedule import MarketSchedule
+            configs = MarketSchedule.SCHEDULE_CONFIGS
+            self._set_headers(200)
+            self.wfile.write(json.dumps(configs, default=str).encode("utf-8"))
             return
 
         # 2. Servir frontend estático (HTML, JS, CSS)

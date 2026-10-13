@@ -51,6 +51,22 @@ class OpportunityCard(BaseModel):
         default_factory=list,
         description="Titulares o URLs que respaldan el análisis"
     )
+    horario_mercado: Optional[str] = Field(
+        default=None,
+        description="Ventana horaria de negociación oficial en Argentina (UTC-3)"
+    )
+    mercado_abierto: Optional[bool] = Field(
+        default=None,
+        description="Estado de apertura en tiempo real"
+    )
+    proxima_apertura: Optional[str] = Field(
+        default=None,
+        description="Próxima apertura operativa recomendada para evitar datos congelados"
+    )
+    categoria_mercado: Optional[str] = Field(
+        default=None,
+        description="Categoría o tipo de activo según horarios de mercado"
+    )
 
 
 class AnalysisBatch(BaseModel):
@@ -116,5 +132,25 @@ class GuiaOperador(BaseModel):
     )
     consejo_psicologico: str = Field(
         description="Traducción psicológica de las noticias para no dejarse llevar por el miedo o FOMO"
+    )
+    horario_mercado: Optional[str] = Field(
+        default=None,
+        description="Ventana horaria de negociación oficial en Argentina (UTC-3)"
+    )
+    mercado_abierto: Optional[bool] = Field(
+        default=None,
+        description="Estado de apertura en tiempo real"
+    )
+    proxima_apertura: Optional[str] = Field(
+        default=None,
+        description="Próxima apertura operativa o evento horario para disparar la orden con liquidez viva"
+    )
+    categoria_mercado: Optional[str] = Field(
+        default=None,
+        description="Categoría o tipo de activo según horarios de mercado"
+    )
+    recomendacion_horaria: Optional[str] = Field(
+        default=None,
+        description="Instrucción antibot y advertencia de gap para novatos"
     )
 

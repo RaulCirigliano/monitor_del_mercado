@@ -19,10 +19,14 @@ class MarkdownReportGenerator:
         target_line = f"- **Target Proyectado:** `{card.target_proyectado}`\n" if card.target_proyectado else ""
         sources = "\n".join(f"  - {s}" for s in card.fuentes_relacionadas) if card.fuentes_relacionadas else "  - Monitoreo de flujo informativo"
 
+        schedule_status = "🟢 ABIERTO EN VIVO" if card.mercado_abierto else "🔴 CERRADO"
+        schedule_line = f"* **Horario de Mercado ({card.categoria_mercado or 'Argentina UTC-3'}):** `{card.horario_mercado}` ({schedule_status})\n" if card.horario_mercado else ""
+        opening_line = f"* **Próxima Apertura Operativa:** `{card.proxima_apertura}` (esperar cotizaciones vivas)\n" if (card.proxima_apertura and not card.mercado_abierto) else ""
+
         return f"""### 📌 {card.ticker} — {card.asset_name}
 * **Clasificación:** `{card.tipo}`
 * **Diagnóstico de Sentimiento:** `{card.sentimiento_mercado}`
-* **Score de Asimetría:** **{card.score_asimetria}/10**
+{schedule_line}{opening_line}* **Score de Asimetría:** **{card.score_asimetria}/10**
 * **Ratio Riesgo/Beneficio:** **1 a {card.ratio_riesgo_beneficio:.1f}**
 * **Horizonte Temporal:** `{card.horizonte_temporal}`
 * **Nivel de Entrada / Acumulación:** `{card.nivel_entrada_sugerido}`
@@ -128,10 +132,18 @@ class MarkdownReportGenerator:
         if batch.guia_operador:
             guia = batch.guia_operador
             pasos_md = "\n".join(f"* {p}" for p in guia.checklist_pasos)
+
+            mkt_status_line = ""
+            if guia.horario_mercado:
+                st_icon = "🟢 ABIERTO" if guia.mercado_abierto else "🔴 CERRADO"
+                mkt_status_line = f"> **Estado y Horario ({guia.categoria_mercado or 'Mercado'}):** `{st_icon}` — {guia.horario_mercado}  \n"
+            if guia.proxima_apertura and not guia.mercado_abierto:
+                mkt_status_line += f"> **Próxima Ventana de Operación:** {guia.proxima_apertura} (Esperar apertura para evitar datos obsoletos / gap)  \n"
+
             md_content += f"""
 ## 🧭 3. Hoja de Ruta del Operador (Plan de Acción Paso a Paso para Principiantes)
 > **Semáforo de Decisión:** `{guia.estado_semaforo}`  
-> **Instrucción Operativa:** {guia.mensaje_principal}
+{mkt_status_line}> **Instrucción Operativa:** {guia.mensaje_principal}
 
 ### 📋 Checklist Operativo en Español Llano:
 {pasos_md}

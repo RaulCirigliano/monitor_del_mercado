@@ -191,16 +191,19 @@
             </p>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-            <!-- Materias Primas y Energía -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+            <!-- 1. Materias Primas y Energía -->
             <div class="p-3 rounded-lg bg-slate-950/80 border border-slate-800/80 space-y-2">
-              <span class="font-semibold text-amber-400 flex items-center gap-1.5 text-xs">
-                <span>🛢️</span> Materias Primas y Energía:
-              </span>
+              <div>
+                <span class="font-semibold text-amber-400 flex items-center gap-1.5 text-xs">
+                  <span>🛢️</span> Materias Primas:
+                </span>
+                <span class="text-[10px] text-slate-500 font-mono block">Dom 19h - Vie 18h ARG</span>
+              </div>
               <div class="space-y-1 font-mono text-[11px]">
                 <button onclick="setAndInspectTicker('CL=F')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 transition-colors flex justify-between cursor-pointer">
                   <span class="text-amber-300 font-bold">CL=F</span>
-                  <span class="text-slate-400">→ Petróleo WTI</span>
+                  <span class="text-slate-400">→ Petróleo</span>
                 </button>
                 <button onclick="setAndInspectTicker('GC=F')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 transition-colors flex justify-between cursor-pointer">
                   <span class="text-amber-300 font-bold">GC=F</span>
@@ -212,41 +215,47 @@
                 </button>
                 <button onclick="setAndInspectTicker('NG=F')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 transition-colors flex justify-between cursor-pointer">
                   <span class="text-amber-300 font-bold">NG=F</span>
-                  <span class="text-slate-400">→ Gas Natural</span>
+                  <span class="text-slate-400">→ Gas Nat.</span>
                 </button>
               </div>
             </div>
 
-            <!-- Criptomonedas -->
+            <!-- 2. Criptomonedas -->
             <div class="p-3 rounded-lg bg-slate-950/80 border border-slate-800/80 space-y-2">
-              <span class="font-semibold text-cyan-400 flex items-center gap-1.5 text-xs">
-                <span>⚡</span> Criptomonedas:
-              </span>
+              <div>
+                <span class="font-semibold text-cyan-400 flex items-center gap-1.5 text-xs">
+                  <span>⚡</span> Criptomonedas:
+                </span>
+                <span class="text-[10px] text-slate-500 font-mono block">24/7 (Flujo Lun-Vie)</span>
+              </div>
               <div class="space-y-1 font-mono text-[11px]">
                 <button onclick="setAndInspectTicker('BTC-USD')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-cyan-300 font-bold">BTC-USD</span>
+                  <span class="text-cyan-300 font-bold">BTC</span>
                   <span class="text-slate-400">→ Bitcoin</span>
                 </button>
                 <button onclick="setAndInspectTicker('ETH-USD')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-cyan-300 font-bold">ETH-USD</span>
+                  <span class="text-cyan-300 font-bold">ETH</span>
                   <span class="text-slate-400">→ Ethereum</span>
                 </button>
                 <button onclick="setAndInspectTicker('SOL-USD')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-cyan-300 font-bold">SOL-USD</span>
+                  <span class="text-cyan-300 font-bold">SOL</span>
                   <span class="text-slate-400">→ Solana</span>
                 </button>
               </div>
             </div>
 
-            <!-- Bonos e Índices Macro -->
+            <!-- 3. Bonos e Índices Macro -->
             <div class="p-3 rounded-lg bg-slate-950/80 border border-slate-800/80 space-y-2">
-              <span class="font-semibold text-emerald-400 flex items-center gap-1.5 text-xs">
-                <span>🏛️</span> Bonos e Índices Macro:
-              </span>
+              <div>
+                <span class="font-semibold text-emerald-400 flex items-center gap-1.5 text-xs">
+                  <span>🏛️</span> Bonos e Índices:
+                </span>
+                <span class="text-[10px] text-slate-500 font-mono block">Lun-Vie 10:30-17h ARG</span>
+              </div>
               <div class="space-y-1 font-mono text-[11px]">
                 <button onclick="setAndInspectTicker('TLT')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 transition-colors flex justify-between cursor-pointer">
                   <span class="text-emerald-300 font-bold">TLT</span>
-                  <span class="text-slate-400">→ Bonos Tesoro</span>
+                  <span class="text-slate-400">→ Bonos 20A</span>
                 </button>
                 <button onclick="setAndInspectTicker('^GSPC')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 transition-colors flex justify-between cursor-pointer">
                   <span class="text-emerald-300 font-bold">^GSPC</span>
@@ -254,21 +263,20 @@
                 </button>
                 <button onclick="setAndInspectTicker('QQQ')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 transition-colors flex justify-between cursor-pointer">
                   <span class="text-emerald-300 font-bold">QQQ</span>
-                  <span class="text-slate-400">→ Nasdaq 100</span>
+                  <span class="text-slate-400">→ Nasdaq</span>
                 </button>
               </div>
             </div>
 
-            <!-- Acciones / Empresas Globales -->
+            <!-- 4. Acciones Globales & Tech -->
             <div class="p-3 rounded-lg bg-slate-950/80 border border-slate-800/80 space-y-2">
-              <span class="font-semibold text-purple-400 flex items-center gap-1.5 text-xs">
-                <span>🏢</span> Acciones / Empresas Globales:
-              </span>
+              <div>
+                <span class="font-semibold text-purple-400 flex items-center gap-1.5 text-xs">
+                  <span>🏢</span> Global & Tech:
+                </span>
+                <span class="text-[10px] text-slate-500 font-mono block">Wall St 10:30-17h ARG</span>
+              </div>
               <div class="space-y-1 font-mono text-[11px]">
-                <button onclick="setAndInspectTicker('BABA')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-purple-300 font-bold">BABA</span>
-                  <span class="text-slate-400">→ Alibaba</span>
-                </button>
                 <button onclick="setAndInspectTicker('NVDA')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 transition-colors flex justify-between cursor-pointer">
                   <span class="text-purple-300 font-bold">NVDA</span>
                   <span class="text-slate-400">→ Nvidia</span>
@@ -280,6 +288,38 @@
                 <button onclick="setAndInspectTicker('TSLA')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 transition-colors flex justify-between cursor-pointer">
                   <span class="text-purple-300 font-bold">TSLA</span>
                   <span class="text-slate-400">→ Tesla</span>
+                </button>
+                <button onclick="setAndInspectTicker('BABA')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 transition-colors flex justify-between cursor-pointer">
+                  <span class="text-purple-300 font-bold">BABA</span>
+                  <span class="text-slate-400">→ Alibaba</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 5. Mercado Local Argentino -->
+            <div class="p-3 rounded-lg bg-slate-950/80 border border-slate-800/80 space-y-2">
+              <div>
+                <span class="font-semibold text-blue-400 flex items-center gap-1.5 text-xs">
+                  <span>🇦🇷</span> Merval Local:
+                </span>
+                <span class="text-[10px] text-slate-500 font-mono block">Lun-Vie 11:00-17h ARG</span>
+              </div>
+              <div class="space-y-1 font-mono text-[11px]">
+                <button onclick="setAndInspectTicker('GGAL')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-blue-500/50 transition-colors flex justify-between cursor-pointer">
+                  <span class="text-blue-300 font-bold">GGAL</span>
+                  <span class="text-slate-400">→ Galicia</span>
+                </button>
+                <button onclick="setAndInspectTicker('YPFD')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-blue-500/50 transition-colors flex justify-between cursor-pointer">
+                  <span class="text-blue-300 font-bold">YPFD</span>
+                  <span class="text-slate-400">→ YPF</span>
+                </button>
+                <button onclick="setAndInspectTicker('PAMP')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-blue-500/50 transition-colors flex justify-between cursor-pointer">
+                  <span class="text-blue-300 font-bold">PAMP</span>
+                  <span class="text-slate-400">→ Pampa</span>
+                </button>
+                <button onclick="setAndInspectTicker('BMA')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-blue-500/50 transition-colors flex justify-between cursor-pointer">
+                  <span class="text-blue-300 font-bold">BMA</span>
+                  <span class="text-slate-400">→ Macro</span>
                 </button>
               </div>
             </div>
@@ -474,13 +514,51 @@
         <div id="operator-guide-container" class="space-y-4">
           <!-- Tarjeta de Mensaje Principal y Semáforo -->
           <div class="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
-            <div class="flex items-center gap-2">
-              <span class="text-base">📢</span>
-              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300">Instrucción Operativa para Hoy:</h4>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="text-base">📢</span>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300">Instrucción Operativa para Hoy:</h4>
+              </div>
+              <button id="btn-copy-macro" onclick="copyMacroInstruction()" class="px-2.5 py-1 rounded bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-700/60 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all cursor-pointer">
+                <span>📋</span>
+                <span id="copy-macro-text">Copiar para Contexto Macro</span>
+              </button>
             </div>
             <p id="operator-main-message" class="text-sm text-white font-medium leading-relaxed pl-3 border-l-2 border-cyan-500">
               Cargando hoja de ruta operativa...
             </p>
+          </div>
+
+          <!-- Tarjeta de Estado y Horarios de Mercado (Anti-Datos Obsoletos y Anti-Gap) -->
+          <div id="operator-schedule-card" class="p-4 rounded-xl bg-slate-950/90 border border-slate-800/80 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="text-base">🕒</span>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300">Inteligencia de Horarios & Apertura (Hora Argentina UTC-3):</h4>
+              </div>
+              <span id="operator-market-badge" class="px-2.5 py-1 rounded text-xs font-mono font-bold flex items-center gap-1.5 bg-slate-900 text-slate-300 border border-slate-700">
+                <span id="operator-market-dot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+                <span id="operator-market-status-text">Verificando horario...</span>
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+              <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1">
+                <span class="text-slate-400 block text-[11px]">Categoría & Horario Oficial:</span>
+                <div id="operator-schedule-hours" class="text-white font-bold">Lunes a Viernes de 10:30 AM a 17:00 PM ARG</div>
+              </div>
+              <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1">
+                <span class="text-slate-400 block text-[11px]">Próxima Apertura / Ventana Operativa:</span>
+                <div id="operator-next-open" class="text-cyan-400 font-bold">Calculando próxima sesión...</div>
+              </div>
+            </div>
+
+            <div id="operator-bot-warning" class="text-xs p-3 rounded-lg bg-amber-950/30 border border-amber-800/40 text-amber-200/90 leading-relaxed font-sans flex items-start gap-2">
+              <span class="text-amber-400 font-bold text-sm shrink-0">⚠️</span>
+              <span id="operator-bot-warning-text">
+                Si operas con un bot cuantitativo o trading algorítmico: espera a que el mercado abra para evitar que el bot rechace la orden por "datos obsoletos" (antigüedad > 2700s) o asumas riesgo de salto de precio (gap).
+              </span>
+            </div>
           </div>
 
           <!-- Checklist de Pasos a Ejecutar -->

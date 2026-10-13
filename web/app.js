@@ -284,6 +284,14 @@ function renderReport(report) {
   const riskRule = document.getElementById('operator-risk-rule');
   const psychoAdv = document.getElementById('operator-psycho-advice');
 
+  // Elementos de la tarjeta de Horarios de Mercado
+  const mktBadge = document.getElementById('operator-market-badge');
+  const mktDot = document.getElementById('operator-market-dot');
+  const mktStatusText = document.getElementById('operator-market-status-text');
+  const schedHours = document.getElementById('operator-schedule-hours');
+  const nextOpen = document.getElementById('operator-next-open');
+  const botWarningText = document.getElementById('operator-bot-warning-text');
+
   if (guia) {
     if (semText) semText.innerText = guia.estado_semaforo;
     if (semBadge) {
@@ -291,11 +299,44 @@ function renderReport(report) {
         semBadge.className = 'text-xs px-3 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 font-mono font-bold flex items-center gap-1.5';
       } else if (guia.estado_semaforo.includes('PELIGRO')) {
         semBadge.className = 'text-xs px-3 py-1 rounded-full bg-red-950 text-red-300 border border-red-800 font-mono font-bold flex items-center gap-1.5';
-      } else {
-        semBadge.className = 'text-xs px-3 py-1 rounded-full bg-amber-950 text-amber-300 border border-amber-800 font-mono font-bold flex items-center gap-1.5';
       }
     }
-    if (mainMsg) mainMsg.innerText = guia.mensaje_principal;
+    let fullInstruction = guia.mensaje_principal || '';
+    if (guia.mercado_abierto === false && !fullInstruction.includes('CERRADO') && !fullInstruction.includes('ATENCIÓN HORARIO')) {
+      fullInstruction += ` ⚠️ ATENCIÓN HORARIO (MERCADO CERRADO): El mercado físico de ${guia.ticker_referencia || 'este activo'} opera de ${guia.horario_mercado || 'Wall Street 10:30 a 17:00 ARG'} y está CERRADO ahora. No dispares órdenes a tu bot con cotizaciones congeladas para evitar el error de 'datos obsoletos' y el riesgo de Gap de apertura. Ejecuta a partir de la apertura: ${guia.proxima_apertura}.`;
+    } else if (guia.mercado_abierto === true && !fullInstruction.includes('ABIERTO') && !fullInstruction.includes('EN VIVO')) {
+      fullInstruction += ` 🟢 MERCADO EN VIVO: El mercado está ABIERTO (${guia.horario_mercado || 'Horario oficial'}). El bot dispone de cotizaciones frescas y liquidez real para operar.`;
+    }
+    if (mainMsg) mainMsg.innerText = fullInstruction;
+
+    // Renderizar Horarios y Estado de Mercado en Tiempo Real
+    const isMktOpen = guia.mercado_abierto === true;
+    if (mktStatusText) {
+      mktStatusText.innerText = guia.estado_texto || (isMktOpen ? '🟢 MERCADO ABIERTO' : '🔴 MERCADO CERRADO');
+    }
+    if (mktDot) {
+      mktDot.className = isMktOpen ? 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse' : 'w-2 h-2 rounded-full bg-red-400';
+    }
+    if (mktBadge) {
+      mktBadge.className = isMktOpen
+        ? 'px-2.5 py-1 rounded text-xs font-mono font-bold flex items-center gap-1.5 bg-emerald-950 text-emerald-300 border border-emerald-700'
+        : 'px-2.5 py-1 rounded text-xs font-mono font-bold flex items-center gap-1.5 bg-red-950 text-red-300 border border-red-800';
+    }
+    if (schedHours) {
+      schedHours.innerText = `${guia.categoria_mercado ? guia.categoria_mercado + ' • ' : ''}${guia.horario_mercado || 'Lunes a Viernes de 10:30 AM a 17:00 PM ARG'}`;
+    }
+    if (nextOpen) {
+      nextOpen.innerText = guia.proxima_apertura || (isMktOpen ? 'Sesión en curso' : 'Próxima apertura comercial');
+      nextOpen.className = isMktOpen ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold';
+    }
+    if (botWarningText) {
+      botWarningText.innerText = guia.recomendacion_horaria || (
+        isMktOpen
+          ? 'El mercado físico está recibiendo velas en vivo. Tu bot de trading puede operar con cotizaciones frescas.'
+          : 'El mercado físico está cerrado ahora. No dispares órdenes a tu bot con datos congelados (antigüedad > 2700s) para evitar rechazos o gaps.'
+      );
+    }
+
     if (checkList) {
       checkList.innerHTML = '';
       if (guia.checklist_pasos && guia.checklist_pasos.length > 0) {
@@ -310,6 +351,38 @@ function renderReport(report) {
     if (riskRule) riskRule.innerText = guia.regla_gestion_riesgo;
     if (psychoAdv) psychoAdv.innerText = guia.consejo_psicologico;
   }
+}
+
+function copyMacroInstruction() {
+  const mainMsg = document.getElementById('operator-main-message');
+  const btnText = document.getElementById('copy-macro-text');
+  if (!mainMsg) return;
+
+  const textToCopy = mainMsg.innerText;
+  navigator.clipboard.writeText(textToCopy).then(() => {
+    if (btnText) {
+      const orig = btnText.innerText;
+      btnText.innerText = '¡Copiado!';
+      setTimeout(() => {
+        btnText.innerText = orig;
+      }, 2000);
+    }
+  }).catch(() => {
+    // Fallback para navegadores antiguos
+    const textarea = document.createElement('textarea');
+    textarea.value = textToCopy;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    if (btnText) {
+      const orig = btnText.innerText;
+      btnText.innerText = '¡Copiado!';
+      setTimeout(() => {
+        btnText.innerText = orig;
+      }, 2000);
+    }
+  });
 }
 
 function synthesizeGuideForNovice(report) {
@@ -397,6 +470,14 @@ function createOpportunityCard(card) {
         <div class="flex justify-between">
           <span class="text-slate-400">Target proyectado:</span>
           <span class="text-emerald-400 font-bold">${escapeHtml(card.target_proyectado)}</span>
+        </div>` : ''}
+        ${card.horario_mercado ? `
+        <div class="flex justify-between pt-1 border-t border-slate-800/80">
+          <span class="text-slate-400">Horario:</span>
+          <span class="${card.mercado_abierto ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}">
+            ${card.mercado_abierto ? '🟢 ABIERTO' : '🔴 CERRADO'}
+            <span class="text-slate-400 text-[10px] font-normal">(${escapeHtml(card.horario_mercado)})</span>
+          </span>
         </div>` : ''}
       </div>
 
@@ -550,16 +631,32 @@ async function inspectTicker() {
       rsiBadge = `<span class="px-1.5 py-0.5 rounded border text-[11px] ${rsiColor}">RSI(14): ${data.rsi_14}</span>`;
     }
 
+    let schedLine = '';
+    if (data.schedule) {
+      const isOp = data.schedule.mercado_abierto;
+      const statusColor = isOp ? 'text-emerald-400 bg-emerald-950/80 border-emerald-800' : 'text-red-400 bg-red-950/80 border-red-800';
+      schedLine = `
+        <div class="flex flex-wrap items-center justify-between gap-1 pt-1.5 border-t border-slate-800/80 text-[11px]">
+          <div class="flex items-center gap-1.5">
+            <span class="px-1.5 py-0.5 rounded border font-bold ${statusColor}">${data.schedule.estado_texto}</span>
+            <span class="text-slate-400">${data.schedule.categoria} (${data.schedule.horario_argentina})</span>
+          </div>
+          <span class="${isOp ? 'text-emerald-400' : 'text-amber-400'} font-bold">${data.schedule.proxima_apertura}</span>
+        </div>
+      `;
+    }
+
     resultDiv.innerHTML = `
       <div class="w-full space-y-1">
         <div class="flex justify-between items-center">
-          <strong class="text-white">${data.ticker}</strong>
+          <strong class="text-white text-sm">${data.ticker}</strong>
           <span class="font-bold text-white">${data.current_price} ${data.currency} <span class="${changeClass}">(${data.change_pct_24h > 0 ? '+' : ''}${data.change_pct_24h}%)</span></span>
         </div>
         <div class="flex justify-between text-[11px] text-slate-400">
           <span>Máx 52s: ${data.pct_from_52w_high}% | Mín: +${data.pct_from_52w_low}%</span>
           ${rsiBadge}
         </div>
+        ${schedLine}
       </div>
     `;
   } catch (err) {

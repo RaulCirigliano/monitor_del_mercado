@@ -135,3 +135,58 @@ def test_guia_operador_and_parsing():
         assert len(parsed["guia_operador"]["checklist_pasos"]) >= 1
 
 
+def test_market_schedule_and_operator_guidance():
+    from datetime import datetime, timezone, timedelta
+    from src.ingestion.market_schedule import MarketSchedule
+    from src.intelligence.contrarian_evaluator import ContrarianEvaluator
+
+    arg_tz = timezone(timedelta(hours=-3))
+
+    # 1. Test Crypto (24/7)
+    btc_status = MarketSchedule.check_status("BTC-USD")
+    assert btc_status["mercado_abierto"] is True
+    assert "24/7" in btc_status["estado_texto"]
+
+    # 2. Test TLT con horario simulado de mercado cerrado (20:51 ARG)
+    dt_closed = datetime(2026, 10, 12, 20, 51, tzinfo=arg_tz)  # Lunes 20:51 ARG
+    tlt_closed = MarketSchedule.check_status("TLT", ref_dt=dt_closed)
+    assert tlt_closed["mercado_abierto"] is False
+    assert "CERRADO" in tlt_closed["estado_texto"]
+    assert "10:30" in tlt_closed["proxima_apertura"]
+    assert "datos congelados" in tlt_closed["recomendacion_horaria"] or "cerrado" in tlt_closed["recomendacion_horaria"]
+
+    # 3. Test TLT con horario simulado de mercado abierto (14:00 ARG)
+    dt_open = datetime(2026, 10, 12, 14, 0, tzinfo=arg_tz)  # Lunes 14:00 ARG
+    tlt_open = MarketSchedule.check_status("TLT", ref_dt=dt_open)
+    assert tlt_open["mercado_abierto"] is True
+    assert "ABIERTO" in tlt_open["estado_texto"]
+
+    # 4. Test Merval Local (GGAL)
+    ggal_status = MarketSchedule.check_status("GGAL")
+    assert "Local" in ggal_status["categoria"] or "BYMA" in ggal_status["categoria"]
+
+    # 5. Test integración con ContrarianEvaluator._build_operator_guide
+    evaluator = ContrarianEvaluator()
+    opp_card = OpportunityCard(
+        ticker="TLT",
+        asset_name="iShares 20+ Year Treasury Bond ETF",
+        tipo="Oportunidad Asimétrica",
+        sentimiento_mercado="Pánico Extremo / Capitulación",
+        tesis_contrarian="Existe una oportunidad asimétrica favorable en TLT.",
+        catalizador_detonante="Tasas altas.",
+        soporte_secular="Deuda soberana.",
+        ratio_riesgo_beneficio=3.5,
+        nivel_entrada_sugerido="78.00 USD",
+        stop_loss_sugerido="74.00 USD",
+        target_proyectado="95.00 USD",
+        horizonte_temporal="6-12 meses",
+        score_asimetria=8,
+    )
+    guia = evaluator._build_operator_guide([opp_card], [])
+    assert guia.horario_mercado is not None
+    assert "10:30" in guia.horario_mercado
+    assert guia.proxima_apertura is not None
+    assert len(guia.checklist_pasos) >= 4
+
+
+
