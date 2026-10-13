@@ -35,7 +35,7 @@ class ContrarianEvaluator:
     4. Garantía absoluta de entregar una respuesta final estructurada.
     """
 
-    STEP_TIMEOUT = 25.0  # Límite máximo en segundos por cada inferencia
+    STEP_TIMEOUT = float(getattr(settings, "ollama_timeout", 120.0))
 
     def __init__(self, use_gemini: bool = False):
         self.ollama = OllamaClient()
@@ -141,30 +141,10 @@ class ContrarianEvaluator:
             card.categoria_mercado = sch.get("categoria")
             return card
         except Exception as e:
-            logger.warning(f"Error generando ficha detallada para {ticker}: {e}")
-            # Si falla la generación detallada, construir una ficha de síntesis basada en datos duros
-            if snapshot and snapshot.current_price:
-                sch = MarketSchedule.check_status(ticker)
-                return OpportunityCard(
-                    ticker=ticker,
-                    asset_name=ticker,
-                    tipo="Oportunidad Asimétrica",
-                    sentimiento_mercado="Pánico Extremo / Capitulación",
-                    tesis_contrarian=f"Señales de sobreventa detectadas a partir de la conclusión: {prior_conclusion[:150]}",
-                    catalizador_detonante="Pánico mediático transitorio.",
-                    soporte_secular="Soporte técnico cercano a mínimos recientes.",
-                    ratio_riesgo_beneficio=3.0,
-                    nivel_entrada_sugerido=f"Zona de {snapshot.current_price:.2f} {snapshot.currency}",
-                    stop_loss_sugerido=f"{(snapshot.current_price * 0.95):.2f} {snapshot.currency}",
-                    target_proyectado=f"{(snapshot.current_price * 1.15):.2f} {snapshot.currency}",
-                    horizonte_temporal="3-6 meses",
-                    score_asimetria=7,
-                    fuentes_relacionadas=["Métricas técnicas de mercado"],
-                    horario_mercado=sch.get("horario_argentina"),
-                    mercado_abierto=sch.get("mercado_abierto"),
-                    proxima_apertura=sch.get("proxima_apertura"),
-                    categoria_mercado=sch.get("categoria"),
-                )
+            logger.warning(
+                f"No se pudo generar ficha validada por IA para {ticker}: {e}. "
+                "Descartado estrictamente para evitar generar datos inventados o alucinaciones."
+            )
             return None
 
     def evaluate(
@@ -254,8 +234,8 @@ class ContrarianEvaluator:
             opp = opportunities[0]
             ticker = opp.ticker
             entry = opp.nivel_entrada_sugerido
-            stop = opp.stop_loss_sugerido or "5% por debajo del precio de entrada"
-            target = opp.target_proyectado or "15% a 20% por encima de la entrada"
+            stop = opp.stop_loss_sugerido or "Definir Stop Loss defensivo según nivel de soporte técnico"
+            target = opp.target_proyectado or "Definir objetivo de toma de ganancias según resistencia"
             sch = MarketSchedule.check_status(ticker)
 
             if sch["mercado_abierto"]:
@@ -265,7 +245,6 @@ class ContrarianEvaluator:
                     f"El mercado recibe volumen y velas frescas; puedes enviar órdenes u operar con tu bot en tiempo real."
                 )
                 paso1 = f"1. LOCALIZA EL ACTIVO ({sch['estado_texto']}): Abre tu broker o plataforma. El mercado para '{ticker}' ({opp.asset_name}) está ABIERTO ({sch['horario_argentina']}) con liquidez viva."
-                paso2 = f"2. ORDEN DE COMPRA (NO COMPRES A CUALQUIER PRECIO): Configura una orden límite en la zona de {entry}. No compres a mercado apresuradamente; espera que el precio venga a ti."
             else:
                 mensaje_horario = (
                     f"⚠️ ATENCIÓN HORARIO ({sch['estado_texto']}): "
@@ -277,20 +256,16 @@ class ContrarianEvaluator:
                     f"1. ESPERA A LA APERTURA ({sch['estado_texto']}): El mercado de {ticker} opera de {sch['horario_argentina']}. "
                     f"Actualmente está cerrado. Próxima apertura operativa: {sch['proxima_apertura']}."
                 )
-                paso2 = (
-                    f"2. PREPARA TU TESIS EN EL BOT O BROKER: Puedes dejar configurada tu orden límite en {entry} o cargada la tesis macro, "
-                    f"pero mantén la orden en pausa hasta las {sch['proxima_apertura']} para que gatille con cotizaciones en vivo."
-                )
 
             pasos = [
                 paso1,
-                paso2,
-                f"3. PROTEGE TU CAPITAL (STOP LOSS OBLIGATORIO): En el mismo instante que se ejecute la compra, coloca tu orden de venta defensiva (Stop Loss) en {stop}. Este es tu cinturón de seguridad: si el precio cae a ese punto, se vende automáticamente para que tu pérdida sea pequeña y controlada.",
-                f"4. PLANIFICA TU GANANCIA (TAKE PROFIT): Programa una orden de toma de ganancias en {target}. Si el precio alcanza ese objetivo, retira beneficios sin codicia.",
-                f"5. MONITOREA SIN ANSIEDAD: El horizonte estimado es de {opp.horizonte_temporal}. No mires el gráfico cada 5 minutos; dale tiempo a la tesis para desarrollarse.",
+                f"2. ORDEN DE COMPRA (PRECIO LÍMITE): Nivel sugerido: {entry}. Ratio Riesgo/Beneficio proyectado: 1 a {opp.ratio_riesgo_beneficio:.1f}.",
+                f"3. PROTECCIÓN DE CAPITAL (STOP LOSS): Ubicar orden defensiva en {stop}. Catalizador de riesgo a monitorear: {opp.catalizador_detonante}.",
+                f"4. OBJETIVO (TAKE PROFIT): Ubicar orden de toma de ganancias en {target}. Soporte secular de fondo: {opp.soporte_secular}.",
+                f"5. HORIZONTE TEMPORAL: Plazo estimado de maduración de la tesis: {opp.horizonte_temporal}.",
             ]
 
-            mensaje_base = f"Existe una oportunidad de inversión asimétrica favorable en {ticker}. La multitud está asustada y vendiendo, lo que te permite comprar a un precio castigado arriesgando poco para ganar el triple."
+            mensaje_base = f"Oportunidad asimétrica real identificada en {ticker} ({opp.asset_name}): {opp.tesis_contrarian}"
 
             return GuiaOperador(
                 estado_semaforo="OPERAR CON CAUTELA",

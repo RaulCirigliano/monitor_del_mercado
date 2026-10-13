@@ -20,13 +20,14 @@ DEBES responder EXCLUSIVAMENTE un objeto JSON estricto con:
 STEP2_OPPORTUNITY_SYSTEM = """Eres el analista de 'Monitor del Mercado'.
 Basándote en tu CONCLUSIÓN INTERNA PREVIA y las métricas de mercado, genera la FICHA ESTRUCTURADA DE OPORTUNIDAD ASIMÉTRICA.
 Exigencia: El ratio Riesgo/Beneficio proyectado DEBE ser al menos 3.0 (arriesgar 1 para ganar mínimo 3).
+Opciones válidas para sentimiento_mercado: "Pánico Extremo / Capitulación" o "Miedo / Incertidumbre".
 
-Responde EXCLUSIVAMENTE un objeto JSON estricto con:
+Responde EXCLUSIVAMENTE un objeto JSON estricto con esta estructura exacta:
 {
   "ticker": "SÍMBOLO",
   "asset_name": "Nombre del activo",
   "tipo": "Oportunidad Asimétrica",
-  "sentimiento_mercado": "Pánico Extremo / Capitulación" o "Miedo / Incertidumbre",
+  "sentimiento_mercado": "Pánico Extremo / Capitulación",
   "tesis_contrarian": "Por qué la masa mediática está equivocada y qué evidencia capitulación",
   "catalizador_detonante": "Evento macro, tasa o noticia coyuntural",
   "soporte_secular": "Viento de cola de fondo o valor intrínseco",
@@ -34,7 +35,7 @@ Responde EXCLUSIVAMENTE un objeto JSON estricto con:
   "nivel_entrada_sugerido": "Zona de acumulación o precio",
   "stop_loss_sugerido": "Nivel de invalidación",
   "target_proyectado": "Objetivo de salida",
-  "horizonte_temporal": "ej: 3-6 meses",
+  "horizonte_temporal": "3-6 meses",
   "score_asimetria": 8,
   "fuentes_relacionadas": ["Referencia clave"]
 }
@@ -42,13 +43,14 @@ Responde EXCLUSIVAMENTE un objeto JSON estricto con:
 
 STEP2_DANGER_SYSTEM = """Eres el analista de 'Monitor del Mercado'.
 Basándote en tu CONCLUSIÓN INTERNA PREVIA, genera la FICHA DE ALERTA DE PELIGRO / TRAMPA DE MERCADO por euforia o sobrecompra en techos.
+Opciones válidas para sentimiento_mercado: "Euforia Desmedida / Techo de Mercado" o "Optimismo Creciente".
 
-Responde EXCLUSIVAMENTE un objeto JSON estricto con:
+Responde EXCLUSIVAMENTE un objeto JSON estricto con esta estructura exacta:
 {
   "ticker": "SÍMBOLO",
   "asset_name": "Nombre del activo",
   "tipo": "Trampa de Mercado / Peligro",
-  "sentimiento_mercado": "Euforia Desmedida / Techo de Mercado" o "Optimismo Creciente",
+  "sentimiento_mercado": "Euforia Desmedida / Techo de Mercado",
   "tesis_contrarian": "Por qué el activo está sobrecalentado y la multitud compra en el techo",
   "catalizador_detonante": "Hype mediático o FOMO",
   "soporte_secular": "Riesgo de corrección severa",

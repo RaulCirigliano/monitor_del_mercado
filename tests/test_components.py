@@ -189,4 +189,41 @@ def test_market_schedule_and_operator_guidance():
     assert len(guia.checklist_pasos) >= 4
 
 
+def test_no_synthetic_cards_on_llm_failure():
+    from unittest.mock import MagicMock
+    from src.intelligence.contrarian_evaluator import ContrarianEvaluator
+    from src.models import AssetSnapshot
+
+    evaluator = ContrarianEvaluator()
+    # Mock OllamaClient para simular fallo/timeout en la llamada al modelo
+    evaluator.ollama = MagicMock()
+    evaluator.ollama.is_available.return_value = True
+    evaluator.ollama.generate_json.side_effect = TimeoutError("Simulated LLM Timeout")
+
+    snapshot = AssetSnapshot(
+        ticker="TLT",
+        current_price=78.05,
+        currency="USD",
+        rsi=32.0,
+        sma_200=85.0,
+        pct_from_52w_high=-18.0,
+        pct_from_52w_low=2.0,
+    )
+
+    card = evaluator._step2_build_card(
+        ticker="TLT",
+        prior_conclusion="Conclusión preliminar que falla en generar ficha estructurada",
+        snapshot=snapshot,
+    )
+
+    # DIRECTIVA ESTRICTA: Ante fallo/timeout del LLM, NO inventar datos, stops fijos ni plantillas
+    assert card is None
+
+    # Verificar que ante 0 oportunidades válidas, la guía del operador dicta esperar sin inventar trades
+    guia_vacia = evaluator._build_operator_guide([], [])
+    assert guia_vacia.estado_semaforo == "ESPERAR / NO OPERAR"
+    assert "ruido" in guia_vacia.mensaje_principal.lower()
+
+
+
 

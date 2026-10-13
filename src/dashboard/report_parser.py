@@ -185,17 +185,18 @@ def parse_markdown_report(report_path: Path) -> Dict[str, Any]:
         if result["oportunidades"]:
             opp0 = result["oportunidades"][0]
             sch0 = MarketSchedule.check_status(opp0.get("ticker", "SPY"))
+            tesis_text = opp0.get("tesis_contrarian") or "Análisis cuantitativo de oportunidad asimétrica."
             result["guia_operador"] = {
                 "estado_semaforo": "OPERAR CON CAUTELA",
                 "mensaje_principal": (
-                    f"Existe una oportunidad asimétrica detectada en {opp0.get('ticker')}. "
+                    f"Oportunidad asimétrica detectada en {opp0.get('ticker')}: {tesis_text} "
                     f"Estado: {sch0['estado_texto']}. {sch0['recomendacion_horaria']}"
                 ),
                 "checklist_pasos": [
                     f"1. VERIFICA EL HORARIO ({sch0['estado_texto']}): El mercado de {opp0.get('ticker')} opera de {sch0['horario_argentina']}. {sch0['proxima_apertura']}.",
-                    f"2. ORDEN LÍMITE: Coloca tu orden de compra en {opp0.get('nivel_entrada_sugerido')}.",
-                    f"3. STOP LOSS OBLIGATORIO: Pon tu límite de pérdida en {opp0.get('stop_loss_sugerido') or 'zona defensiva'}.",
-                    f"4. TAKE PROFIT: Fija tu salida de beneficios en {opp0.get('target_proyectado') or 'zona de target'}.",
+                    f"2. PRECIO LÍMITE: {opp0.get('nivel_entrada_sugerido') or 'Esperar confirmación de precio'}.",
+                    f"3. STOP LOSS DEFENSIVO: {opp0.get('stop_loss_sugerido') or 'Definir stop técnico en soporte'}.",
+                    f"4. TAKE PROFIT / OBJETIVO: {opp0.get('target_proyectado') or 'Definir toma de ganancias según resistencia'}.",
                 ],
                 "regla_gestion_riesgo": "REGLA DEL 1%: Nunca arriesgues más del 1-2% del capital de tu cuenta en una sola operación.",
                 "consejo_psicologico": "No compres por impulso ni con mercado cerrado. Espera cotizaciones frescas en vivo.",

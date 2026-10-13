@@ -460,18 +460,19 @@ function synthesizeGuideForNovice(report) {
 
   if (opps.length > 0) {
     const opp0 = opps[0];
+    const tesis = opp0.tesis_contrarian || 'Análisis cuantitativo de asimetría favorable.';
     return {
       estado_semaforo: "OPERAR CON CAUTELA",
-      mensaje_principal: `Existe una oportunidad asimétrica favorable en ${opp0.ticker}. La multitud está asustada y vendiendo, permitiéndote entrar a precio de descuento con una relación beneficio/riesgo de 1 a ${opp0.ratio_riesgo_beneficio}.`,
+      mensaje_principal: `Oportunidad asimétrica en ${opp0.ticker}: ${tesis}`,
       checklist_pasos: [
-        `1. LOCALIZA EL ACTIVO: Abre tu plataforma de inversión y busca el ticker '${opp0.ticker}' (${opp0.asset_name || ''}).`,
-        `2. ORDEN DE COMPRA: Configura una orden límite en ${opp0.nivel_entrada_sugerido}. No compres apurado a mercado.`,
-        `3. STOP LOSS OBLIGATORIO: Coloca tu orden de venta defensiva en ${opp0.stop_loss_sugerido || 'zona defensiva'} para limitar tu riesgo.`,
-        `4. TOMA DE GANANCIAS (TAKE PROFIT): Fija tu objetivo de salida en ${opp0.target_proyectado || 'zona de target'} y retira beneficios sin codicia.`,
-        `5. PACIENCIA: Plazo estimado de ${opp0.horizonte_temporal || '3-6 meses'}. Dale tiempo a la tesis para desarrollarse.`
+        `1. LOCALIZA EL ACTIVO: Abre tu plataforma de inversión y busca '${opp0.ticker}' (${opp0.asset_name || ''}).`,
+        `2. ORDEN DE COMPRA (LÍMITE): Nivel sugerido: ${opp0.nivel_entrada_sugerido || 'Precio actual de mercado'}.`,
+        `3. STOP LOSS DEFENSIVO: Nivel sugerido: ${opp0.stop_loss_sugerido || 'Definir stop loss técnico en zona de soporte'}.`,
+        `4. TOMA DE GANANCIAS (TAKE PROFIT): Objetivo proyectado: ${opp0.target_proyectado || 'Definir toma de ganancias según resistencia'}.`,
+        `5. HORIZONTE TEMPORAL: Plazo estimado: ${opp0.horizonte_temporal || 'Medio plazo'}.`
       ],
-      regla_gestion_riesgo: "REGLA DEL 1%: Nunca arriesgues más del 1% o 2% del total de tu cuenta en esta operación (máx 10-20 USD por cada 1.000 USD de capital).",
-      consejo_psicologico: "No te asustes por los titulares pesimistas. El pánico de los medios es el causante del descuento. Tu ventaja como inversor contrarian es comprar cuando hay sangre y vender cuando hay fiesta."
+      regla_gestion_riesgo: "REGLA DEL 1%: Nunca arriesgues más del 1% o 2% del total de tu cuenta en esta operación.",
+      consejo_psicologico: "Opera con disciplina matemática y respeta tus niveles de stop loss sin apego emocional."
     };
   } else if (dangers.length > 0) {
     const danger0 = dangers[0];

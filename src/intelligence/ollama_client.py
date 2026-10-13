@@ -43,9 +43,9 @@ class OllamaClient:
         max_tokens: int = 400,
         timeout: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Envía el prompt a Ollama con límite estricto de tiempo y longitud para forzar respuestas rápidas."""
+        """Envía el prompt a Ollama respetando el timeout configurado."""
         url = f"{self.host}/api/chat"
-        call_timeout = timeout or min(self.timeout, 30.0)  # Límite estricto de 30s por defecto
+        call_timeout = timeout or self.timeout
 
         payload = {
             "model": self.model,
