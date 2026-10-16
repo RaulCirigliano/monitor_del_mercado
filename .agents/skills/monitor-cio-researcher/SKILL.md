@@ -136,6 +136,21 @@ flowchart TD
    - **Take Profit:** Situado al menos a $3 \times$ la distancia del Stop Loss (ratio $R/B \ge 3.0$).
 
 4. **Fase 4: Publicación e Inyección**
-   - Envía el informe estructurado a `POST http://127.0.0.1:8520/api/cio/publish` con `auto_inject: true`.
-   - El Monitor del Mercado guardará el reporte Markdown, actualizará la interfaz gráfica visual y reenviará la directiva al bot `trading_ollama`.
+   - Envía el informe estructurado a `POST http://127.0.0.1:8520/api/cio/publish` (o puerto configurado) con `auto_inject: true`.
+   - El Monitor del Mercado guardará el reporte Markdown, actualizará la interfaz gráfica visual y reenviará la directiva al bot `trading_ollama` (`http://127.0.0.1:18767/api/macro/inject`).
    - Informa al usuario en el chat con un resumen conciso de la tesis y los niveles adoptados.
+
+---
+
+## 🔄 Modos Operativos del Agente
+
+Al ser activado en la conversación, el agente puede operar bajo tres modalidades según las instrucciones del operador:
+
+- **Modo A (Automático cada 15 min con `/schedule`):**
+  - Programa una ejecución recurrente mediante el programador (`schedule` con cron `*/15 * * * *`).
+  - En cada ciclo, consulta `GET /api/cio/candidates`, audita métricas estadísticas ($Z\text{-Score} \le -2.0$, $RSI \le 35$) y noticias en busca de capitulaciones reales, y si detecta una oportunidad con $R/B \ge 1:3$, publica el reporte con `auto_inject: true`.
+- **Modo B (A Demanda / Manual):**
+  - El CIO permanece a la espera y solo ejecuta la auditoría completa cuando el usuario lo solicite expresamente en el chat (ej. *"Ejecuta la auditoría CIO del Monitor del Mercado"*).
+- **Desconexión / Standby:**
+  - Si el usuario indica *"desconectar"*, *"pausar"*, *"detener"* o *"stop"*, el agente cancela cualquier tarea programada activa en `manage_task` y pasa a estado inactivo (standby).
+

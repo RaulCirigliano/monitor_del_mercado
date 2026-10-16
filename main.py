@@ -97,7 +97,13 @@ def main():
         "--category",
         type=str,
         default=None,
-        choices=["macro_and_markets", "commodities_and_energy", "crypto_and_alternatives"],
+        choices=[
+            "macro_and_markets",
+            "argentina_and_latam",
+            "global_tech_and_china",
+            "commodities_and_energy",
+            "crypto_and_alternatives",
+        ],
         help="Filtra el escaneo únicamente por una categoría temática.",
     )
     parser.add_argument(
@@ -125,8 +131,8 @@ def main():
     parser.add_argument(
         "--port",
         type=int,
-        default=8520,
-        help="Puerto para el servidor del Dashboard web (por defecto: 8520 con auto-resolución de conflictos).",
+        default=int(os.environ.get("PORT", os.environ.get("DASHBOARD_PORT", 8520))),
+        help="Puerto para el servidor del Dashboard web (por defecto: 8520 o variable PORT/DASHBOARD_PORT).",
     )
     parser.add_argument(
         "--directive",
