@@ -5,15 +5,10 @@ async function fetchStatus() {
     const res = await fetch('/api/status');
     const data = await res.json();
     const statusDiv = document.getElementById('ollama-status');
-    if (data.ollama_online && data.ollama_model_available) {
+    if (data.ollama_online) {
       statusDiv.innerHTML = `
         <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span class="text-slate-300">Ollama: <strong class="text-emerald-400">${data.ollama_model}</strong></span>
-      `;
-    } else if (data.ollama_online) {
-      statusDiv.innerHTML = `
-        <span class="w-2 h-2 rounded-full bg-amber-400"></span>
-        <span class="text-slate-300">Modelo no instalado: <strong class="text-amber-400">${escapeHtml(data.ollama_model)}</strong></span>
+        <span class="text-slate-300">Ollama: <strong class="text-emerald-400">En línea</strong></span>
       `;
     } else {
       statusDiv.innerHTML = `

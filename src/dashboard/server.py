@@ -248,7 +248,9 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             return
 
         elif path == "/api/status":
-            ollama = OllamaClient()
+            cfg = self._load_radar_config()
+            active_model = cfg.get("model") or settings.ollama_model
+            ollama = OllamaClient(model=active_model)
             ollama_online = ollama.is_available()
             feeds = settings.load_feeds().get("categories", {})
             total_feeds = sum(len(c.get("feeds", [])) for c in feeds.values())
@@ -256,13 +258,13 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
             payload = {
                 "ollama_online": ollama_online,
-                "ollama_model": ollama.model,
+                "ollama_model": active_model,
                 "ollama_model_available": (
                     ollama.is_model_available() if ollama_online else False
                 ),
                 "reports_count": len(reports),
                 "total_feeds": total_feeds,
-                "radar_config": self._load_radar_config(),
+                "radar_config": cfg,
             }
             self._set_headers(200)
             self.wfile.write(json.dumps(payload).encode("utf-8"))
