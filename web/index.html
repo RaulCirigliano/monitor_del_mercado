@@ -3,713 +3,238 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🦅 Monitor del Mercado — Dashboard Contrarian</title>
-  <!-- Tailwind CSS -->
-  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
-  <style>
-    /* Estilos personalizados para sensación de terminal financiero */
-    body {
-      background-color: #0b0f17;
-      color: #e2e8f0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-    .glass-card {
-      background: rgba(18, 24, 38, 0.85);
-      backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-    .glass-card:hover {
-      border-color: rgba(56, 189, 248, 0.3);
-    }
-    .terminal-scroll::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    .terminal-scroll::-webkit-scrollbar-thumb {
-      background: #334155;
-      border-radius: 3px;
-    }
-  </style>
+  <meta name="theme-color" content="#070A12">
+  <title>Monitor del Mercado — Terminal Contrarian</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/styles.css">
 </head>
-<body class="min-h-screen flex flex-col antialiased">
-
-  <!-- Header Superior -->
-  <header class="border-b border-slate-800 bg-[#0d131f] sticky top-0 z-50 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
-    <div class="flex items-center gap-3">
-      <div class="w-10 h-10 rounded-lg bg-cyan-950 border border-cyan-500/40 flex items-center justify-center text-xl shadow-[0_0_15px_rgba(6,182,212,0.25)]">
-        🦅
+<body>
+  <header class="command-bar">
+    <a class="brand" href="#" aria-label="Monitor del Mercado, inicio">
+      <span class="brand-mark">M</span>
+      <span class="brand-copy">
+        <strong>Monitor <span>del Mercado</span></strong>
+        <small>QUANTITATIVE · CONTRARIAN TERMINAL</small>
+      </span>
+    </a>
+    <div class="header-status">
+      <div id="ollama-status" class="status-chip">
+        <span class="status-dot live"></span><span>Ollama: <strong>Verificando</strong></span>
       </div>
-      <div>
-        <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-          Monitor del Mercado
-          <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800/60 font-mono">v0.1 Contrarian</span>
-        </h1>
-        <p class="text-xs text-slate-400">Cazador Autónomo de Oportunidades Asimétricas ($R/B \ge 1:3$)</p>
+      <div id="mode-badge" class="status-chip mode-chip">Modo: <strong>Inferencia Progresiva</strong></div>
+      <div id="radar-countdown-badge" class="status-chip radar-chip hidden">
+        <span class="status-dot cyan-pulse"></span>
+        <span>RADAR <strong id="radar-countdown-text">60:00</strong></span>
       </div>
-    </div>
-
-    <!-- Indicadores de Estado -->
-    <div class="flex items-center gap-4 text-xs font-mono">
-      <div id="ollama-status" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
-        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span class="text-slate-300">Ollama: <strong class="text-emerald-400">qwen2.5:3b</strong></span>
-      </div>
-      <div id="mode-badge" class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300">
-        Modo: <strong class="text-cyan-400">Inferencia Progresiva</strong>
-      </div>
+      <span id="last-scan-time" class="last-scan-time">Terminal lista</span>
     </div>
   </header>
 
-  <!-- Contenedor Principal -->
-  <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
-
-    <!-- Ventana Principal de Control y Consulta Técnica (Unificada) -->
-    <div class="glass-card rounded-xl p-6 space-y-6 border-slate-800">
-
-      <!-- 1. SECCIÓN SUPERIOR: Panel de Control de Escaneo -->
-      <div class="space-y-3">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-            <span class="w-2.5 h-2.5 bg-cyan-400 rounded-full shadow-[0_0_8px_rgba(6,182,212,0.8)]"></span>
-            Panel de Control de Escaneo
-          </h2>
-          <span class="text-xs text-slate-400 font-mono px-2.5 py-1 rounded bg-slate-900 border border-slate-800" id="last-scan-time">Listo para iniciar</span>
+  <main class="terminal-layout">
+    <aside class="command-column">
+      <section class="panel scan-panel">
+        <div class="panel-heading">
+          <div><span class="eyebrow">01 / CONTROL</span><h1>Centro de comando</h1></div>
+          <span class="live-label"><i></i> EN LÍNEA</span>
         </div>
-
-        <p class="text-xs text-slate-400 leading-relaxed max-w-4xl">
-          Ejecuta la ingesta RSS multicanal, enriquecimiento de cotizaciones con <code>yfinance</code> y evaluación en 2 fases con Ollama local (<strong class="text-slate-300">qwen2.5:3b</strong>) bajo las Tres Verdades Contraintuitivas.
-        </p>
-
-        <!-- Entrada para Directiva o Mensaje Personalizado de Búsqueda -->
-        <div class="space-y-2 pt-1 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
-          <div class="flex flex-wrap items-center justify-between gap-1">
-            <label for="scan-custom-directive" class="text-xs font-semibold text-cyan-300 flex items-center gap-1.5">
-              <span>🎯</span> Directiva / Mensaje de Búsqueda Personalizado (Opcional):
-            </label>
-            <span class="text-[11px] text-slate-400 font-mono">Búsqueda en vivo con Google News RSS</span>
-          </div>
-
-          <div class="relative">
-            <input id="scan-custom-directive" type="text" 
-                   placeholder="Ej: Sigue las noticias sobre las recomendaciones que dio Maslatón, impacto de tasas en bonos, petróleo y guerra..." 
-                   class="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-3.5 py-2.5 pr-8 text-xs text-white placeholder-slate-500 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none">
-            <button type="button" onclick="document.getElementById('scan-custom-directive').value=''" class="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300 text-xs cursor-pointer" title="Limpiar directiva">✕</button>
-          </div>
-
-          <!-- Sugerencias rápidas de 1 clic -->
-          <div class="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
-            <span class="text-slate-400 font-medium">Ejemplos rápidos:</span>
-            <button type="button" onclick="setCustomDirective('Sigue las noticias sobre las recomendaciones que dio Maslatón')" class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-slate-800 hover:border-cyan-500/50 transition-colors cursor-pointer">
-              💬 Maslatón (Recomendaciones)
-            </button>
-            <button type="button" onclick="setCustomDirective('Impacto de recortes de tasas de interés de la FED en bonos y acciones')" class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-slate-800 hover:border-emerald-500/50 transition-colors cursor-pointer">
-              🏛️ Tasas FED & Bonos
-            </button>
-            <button type="button" onclick="setCustomDirective('Escalada geopolítica en Medio Oriente y precio del petróleo WTI')" class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-amber-400 border border-slate-800 hover:border-amber-500/50 transition-colors cursor-pointer">
-              🛢️ Petróleo & Guerra
-            </button>
-            <button type="button" onclick="setCustomDirective('Regulaciones de inteligencia artificial y semiconductores')" class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-purple-400 border border-slate-800 hover:border-purple-500/50 transition-colors cursor-pointer">
-              🤖 IA & Semiconductores
-            </button>
-          </div>
+        <label class="field-label" for="scan-custom-directive">Directiva de escaneo <span>OPCIONAL</span></label>
+        <div class="input-wrap">
+          <input id="scan-custom-directive" type="text" placeholder="Ej. Señales de capitulación en bonos y petróleo">
+          <button type="button" class="icon-button" onclick="document.getElementById('scan-custom-directive').value=''" title="Limpiar directiva" aria-label="Limpiar directiva">×</button>
         </div>
-
-        <div class="flex flex-wrap items-center gap-3 pt-2">
-          <select id="scan-category" class="bg-slate-900 text-slate-200 border border-slate-700 rounded-lg px-3.5 py-2.5 text-xs font-medium focus:ring-1 focus:ring-cyan-500 outline-none flex-1 min-w-[260px]">
-            <option value="">Todas las categorías (Macro, Commodities, Cripto)</option>
-            <option value="commodities_and_energy">Materias Primas & Energía</option>
-            <option value="macro_and_markets">Macroeconomía & Mercados</option>
-            <option value="crypto_and_alternatives">Criptoactivos & Descentralización</option>
-          </select>
-
-          <button id="btn-scan" onclick="triggerScan()" class="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold text-xs px-5 py-2.5 rounded-lg shadow-lg shadow-cyan-900/30 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95">
-            <span id="scan-spinner" class="hidden animate-spin">🌀</span>
-            <span id="scan-btn-text">🚀 Escanear Mercado Ahora</span>
-          </button>
-
-          <button onclick="loadLatestReport()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-4 py-2.5 rounded-lg transition-colors border border-slate-700 cursor-pointer">
-            🔄 Recargar
-          </button>
+        <div class="quick-chips" aria-label="Directivas rápidas">
+          <button type="button" onclick="setCustomDirective('Sigue las noticias sobre las recomendaciones que dio Maslatón')">Maslatón</button>
+          <button type="button" onclick="setCustomDirective('Impacto de recortes de tasas de interés de la FED en bonos y acciones')">FED · Bonos</button>
+          <button type="button" onclick="setCustomDirective('Escalada geopolítica en Medio Oriente y precio del petróleo WTI')">Petróleo · Geopolítica</button>
+          <button type="button" onclick="setCustomDirective('Regulaciones de inteligencia artificial y semiconductores')">IA · Chips</button>
         </div>
-
-        <!-- Control de Modo Radar Continuo en Bucle -->
-        <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800/60 mt-3 text-xs">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-slate-300 font-semibold flex items-center gap-1.5">
-              <span>🔁</span> Radar Continuo Desatendido:
-            </span>
-            <select id="radar-interval" onchange="toggleContinuousRadar()" class="bg-slate-900 text-slate-300 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-cyan-500 outline-none">
-              <option value="0">Desactivado (Escaneo Manual)</option>
-              <option value="15">Escanear cada 15 minutos</option>
-              <option value="30">Escanear cada 30 minutos</option>
-              <option value="60">Escanear cada 60 minutos</option>
-              <option value="120">Escanear cada 2 horas</option>
+        <label class="field-label" for="scan-category">Universo de análisis</label>
+        <select id="scan-category">
+          <option value="">Todas las categorías</option>
+          <option value="commodities_and_energy">Materias primas & energía</option>
+          <option value="macro_and_markets">Macroeconomía & mercados</option>
+          <option value="argentina_and_latam">Argentina & LatAm</option>
+          <option value="global_tech_and_china">Global, IA & China Tech</option>
+          <option value="crypto_and_alternatives">Criptoactivos</option>
+        </select>
+        <button id="btn-scan" onclick="triggerScan()" class="primary-button">
+          <span id="scan-spinner" class="hidden">◌</span>
+          <span id="scan-btn-text">Iniciar escaneo</span>
+          <span class="button-shortcut">↵</span>
+        </button>
+        <div class="radar-controls">
+          <div class="radar-select-row"><label for="radar-interval">Radar continuo</label>
+            <select id="radar-interval" onchange="toggleContinuousRadar()">
+              <option value="0">Desactivado</option>
+              <option value="15">Cada 15 min</option>
+              <option value="30">Cada 30 min</option>
+              <option value="60">Cada 60 min</option>
+              <option value="120">Cada 2 horas</option>
             </select>
           </div>
+          <label class="toggle-row" for="radar-autoinject">
+            <span class="toggle-copy"><strong>Auto-inyección</strong><small>Enviar directiva a Trading Ollama</small></span>
+            <input type="checkbox" id="radar-autoinject">
+            <span class="toggle-switch" aria-hidden="true"></span>
+          </label>
+          <div id="radar-autoinject-status" class="inline-status hidden">Sin transmisión reciente</div>
+        </div>
+      </section>
 
-          <!-- Checkbox de Auto-transmisión a Trading Ollama -->
-          <div class="flex items-center gap-3 flex-wrap">
-            <label class="flex items-center gap-2 cursor-pointer select-none text-slate-300 hover:text-cyan-300 transition-colors">
-              <input type="checkbox" id="radar-autoinject" checked class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-cyan-500 focus:ring-0 cursor-pointer">
-              <span class="font-medium text-xs">📡 Auto-transmitir a Trading Ollama al finalizar</span>
-            </label>
-            <div id="radar-autoinject-status" class="hidden text-[10px] text-emerald-400 font-mono px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-800/60">
-              Directiva transmitida
-            </div>
-          </div>
+      <section class="panel quote-panel">
+        <div class="panel-heading compact-heading">
+          <div><span class="eyebrow">02 / YFINANCE</span><h2>Inspector cuantitativo</h2></div>
+          <span class="source-tag">LIVE QUOTE</span>
+        </div>
+        <div class="quote-search">
+          <input id="ticker-input" type="text" placeholder="Ticker · CL=F, BTC-USD…" autocomplete="off">
+          <button type="button" onclick="inspectTicker()" aria-label="Analizar ticker">↗</button>
+        </div>
+        <div id="ticker-result" class="quote-result">Ingresa un símbolo o selecciona un activo del catálogo.</div>
+        <div class="catalog-heading"><span class="eyebrow">UNIVERSO OPERABLE</span><span class="help-tip" title="Ticker: símbolo bursátil del activo. Selecciona uno para consultar cotización y métricas técnicas.">? <span>Ticker = símbolo bursátil. Selecciona un activo para consultar su precio y métricas.</span></span></div>
+        <div class="ticker-catalog">
+          <div class="ticker-group"><h3>🛢️ Commodities</h3><div class="ticker-list">
+            <button onclick="setAndInspectTicker('CL=F')"><b>CL=F</b><span>Petróleo WTI</span></button>
+            <button onclick="setAndInspectTicker('GC=F')"><b>GC=F</b><span>Oro</span></button>
+            <button onclick="setAndInspectTicker('SI=F')"><b>SI=F</b><span>Plata</span></button>
+            <button onclick="setAndInspectTicker('NG=F')"><b>NG=F</b><span>Gas natural</span></button>
+          </div></div>
+          <div class="ticker-group"><h3>⚡ Cripto</h3><div class="ticker-list">
+            <button onclick="setAndInspectTicker('BTC-USD')"><b>BTC</b><span>Bitcoin</span></button>
+            <button onclick="setAndInspectTicker('ETH-USD')"><b>ETH</b><span>Ethereum</span></button>
+            <button onclick="setAndInspectTicker('SOL-USD')"><b>SOL</b><span>Solana</span></button>
+          </div></div>
+          <div class="ticker-group"><h3>🏛️ Macro</h3><div class="ticker-list">
+            <button onclick="setAndInspectTicker('TLT')"><b>TLT</b><span>Bonos 20A</span></button>
+            <button onclick="setAndInspectTicker('^GSPC')"><b>^GSPC</b><span>S&P 500</span></button>
+            <button onclick="setAndInspectTicker('QQQ')"><b>QQQ</b><span>Nasdaq 100</span></button>
+          </div></div>
+          <div class="ticker-group"><h3>🏢 Global / Tech</h3><div class="ticker-list">
+            <button onclick="setAndInspectTicker('NVDA')"><b>NVDA</b><span>Nvidia</span></button>
+            <button onclick="setAndInspectTicker('AAPL')"><b>AAPL</b><span>Apple</span></button>
+            <button onclick="setAndInspectTicker('TSLA')"><b>TSLA</b><span>Tesla</span></button>
+            <button onclick="setAndInspectTicker('BABA')"><b>BABA</b><span>Alibaba</span></button>
+          </div></div>
+          <div class="ticker-group"><h3>🇦🇷 BYMA · .BA</h3><div class="ticker-list">
+            <button onclick="setAndInspectTicker('GGAL.BA')"><b>GGAL.BA</b><span>Galicia</span></button>
+            <button onclick="setAndInspectTicker('YPFD.BA')"><b>YPFD.BA</b><span>YPF</span></button>
+            <button onclick="setAndInspectTicker('PAMP.BA')"><b>PAMP.BA</b><span>Pampa</span></button>
+            <button onclick="setAndInspectTicker('BMA.BA')"><b>BMA.BA</b><span>Macro</span></button>
+          </div></div>
+        </div>
+      </section>
+    </aside>
 
-          <div id="radar-countdown-badge" class="hidden items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-950/70 border border-cyan-800/70 text-cyan-300 font-mono text-[11px]">
-            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
-            <span>Próximo radar en: <strong id="radar-countdown-text">60:00</strong></span>
+    <div class="intelligence-column">
+      <section id="conclusions-box" class="panel report-panel">
+        <div class="panel-heading">
+          <div><span class="eyebrow">03 / INTELIGENCIA</span><h2>Reportes de mercado</h2></div>
+          <div class="report-filters">
+            <button id="filter-vigentes-btn" class="is-active" onclick="filterReportsTab('vigentes')">Vigentes <span id="count-vigentes">0</span></button>
+            <button id="filter-todos-btn" onclick="filterReportsTab('todos')">Todos <span id="count-todos">0</span></button>
           </div>
         </div>
-      </div>
-
-
-
-      <!-- SEPARADOR -->
-      <div class="border-t border-slate-800/80"></div>
-
-      <!-- 2. SECCIÓN INFERIOR: Consulta Técnica Rápida -->
-      <div class="space-y-4">
-        <div class="flex items-center justify-between">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-            <span class="w-2.5 h-2.5 bg-emerald-400 rounded-full shadow-[0_0_8px_rgba(52,211,153,0.8)]"></span>
-            Consulta Técnica Rápida
-          </h2>
-          <span class="text-[11px] text-emerald-400 font-mono px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/60">yfinance en vivo</span>
+        <div id="reports-list" class="reports-list"><span class="muted">Cargando reportes…</span></div>
+        <div id="report-vigencia-banner" class="report-banner hidden">
+          <div class="report-meta">
+            <span class="muted">ACTIVO</span><strong id="report-active-title"></strong>
+            <span id="report-vigencia-badge" class="badge"></span>
+            <span id="report-mode-badge" class="badge neutral-badge"></span>
+            <span id="report-folder-badge" class="muted"></span>
+            <span id="report-age-text" class="muted"></span>
+          </div>
+          <button id="btn-delete-report" onclick="deleteActiveReport()" class="danger-ghost" title="Eliminar este informe del disco">Eliminar reporte</button>
         </div>
-
-        <div class="space-y-2.5">
-          <div class="flex gap-2 max-w-xl">
-            <input id="ticker-input" type="text" placeholder="Ej: CL=F, BTC-USD, TLT" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-white uppercase focus:ring-1 focus:ring-emerald-500 outline-none">
-            <button onclick="inspectTicker()" class="bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-700/60 font-semibold text-xs px-5 py-2 rounded-lg transition-colors cursor-pointer">
-              Analizar
-            </button>
-          </div>
-          <div id="ticker-result" class="text-xs p-3 rounded-lg bg-slate-950/70 border border-slate-800 font-mono text-slate-300 min-h-[46px] flex items-center">
-            Introduce un ticker o haz clic en cualquiera de los activos inferiores para auditarlo al instante.
-          </div>
+        <div class="executive-block">
+          <div class="section-title"><span class="signal-icon amber">AI</span><div><h3>Síntesis ejecutiva</h3><small>Razonamiento resumido por etapas</small></div></div>
+          <div id="report-directive-badge" class="directive-badge hidden"><span>DIRECTIVA</span><strong id="report-directive-text"></strong></div>
+          <p id="executive-verdict">Cargando conclusiones del último ciclo de escaneo…</p>
+          <div id="step-deductions" class="step-log"></div>
         </div>
+      </section>
 
-        <!-- Explicación y Catálogo de Tickers -->
-        <div class="pt-2 space-y-3 text-xs">
-          <div>
-            <span class="font-bold text-emerald-400 flex items-center gap-1.5 text-xs">
-              <span>💡</span> ¿Qué hace esta lista y qué es un Ticker?
-            </span>
-            <p class="text-xs text-slate-400 mt-1 leading-relaxed">
-              El <strong>ticker</strong> es el código único de un activo en los mercados globales. Haz clic en cualquiera de estos activos para auditar en tiempo real su cotización, proximidad a máximos/mínimos anuales (52 semanas) y el índice RSI(14) para detectar capitulación o sobrecompra al instante:
-            </p>
+      <section class="panel signals-panel">
+        <div class="panel-heading signals-heading">
+          <div><span class="eyebrow">04 / SEÑALES</span><h2>Oportunidad & riesgo</h2></div>
+          <span class="section-caption">Tesis con niveles, métricas y contexto</span>
+        </div>
+        <section class="signal-section opportunity-section">
+          <div class="signal-section-heading">
+            <div class="section-title"><span class="signal-icon emerald">↗</span><div><h3>Oportunidades asimétricas</h3><small>Capitulación, valor y catalizador</small></div></div>
+            <span id="opp-count-badge" class="count-badge emerald-badge">0 detectadas</span>
           </div>
+          <div id="opportunities-container" class="opportunities-grid"></div>
+        </section>
+        <section class="signal-section danger-section">
+          <div class="signal-section-heading">
+            <div class="section-title"><span class="signal-icon rose">!</span><div><h3>Alertas de euforia</h3><small>Riesgo de techo y trampas de mercado</small></div></div>
+            <span id="danger-count-badge" class="count-badge rose-badge">0 activas</span>
+          </div>
+          <div id="dangers-container" class="dangers-grid"></div>
+        </section>
+      </section>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
-            <!-- 1. Materias Primas y Energía -->
-            <div class="p-3 rounded-lg bg-slate-950/80 border border-slate-800/80 space-y-2">
-              <div>
-                <span class="font-semibold text-amber-400 flex items-center gap-1.5 text-xs">
-                  <span>🛢️</span> Materias Primas:
-                </span>
-                <span class="text-[10px] text-slate-500 font-mono block">Dom 19h - Vie 18h ARG</span>
-              </div>
-              <div class="space-y-1 font-mono text-[11px]">
-                <button onclick="setAndInspectTicker('CL=F')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-amber-300 font-bold">CL=F</span>
-                  <span class="text-slate-400">→ Petróleo</span>
-                </button>
-                <button onclick="setAndInspectTicker('GC=F')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-amber-300 font-bold">GC=F</span>
-                  <span class="text-slate-400">→ Oro</span>
-                </button>
-                <button onclick="setAndInspectTicker('SI=F')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-amber-300 font-bold">SI=F</span>
-                  <span class="text-slate-400">→ Plata</span>
-                </button>
-                <button onclick="setAndInspectTicker('NG=F')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-amber-300 font-bold">NG=F</span>
-                  <span class="text-slate-400">→ Gas Nat.</span>
-                </button>
+      <section class="panel operator-panel">
+        <div class="panel-heading">
+          <div><span class="eyebrow">05 / EJECUCIÓN DISCIPLINADA</span><h2>Cockpit del operador</h2></div>
+          <span id="operator-semaphore-badge" class="semaphore-badge"><i></i><span id="operator-semaphore-text">Calculando estado…</span></span>
+        </div>
+        <div id="operator-guide-container" class="operator-content">
+          <div class="operator-directive">
+            <div class="operator-directive-top">
+              <div class="operator-message-label">DIRECTIVA DEL DÍA</div>
+              <div class="operator-actions">
+                <button id="btn-copy-macro" onclick="copyMacroInstruction()" class="secondary-button"><span>⧉</span><span id="copy-macro-text">Copiar contexto macro</span></button>
+                <button id="btn-inject-macro" onclick="openInjectModal()" class="inject-button"><span>↗</span> Inyectar a Trading Ollama</button>
               </div>
             </div>
-
-            <!-- 2. Criptomonedas -->
-            <div class="p-3 rounded-lg bg-slate-950/80 border border-slate-800/80 space-y-2">
-              <div>
-                <span class="font-semibold text-cyan-400 flex items-center gap-1.5 text-xs">
-                  <span>⚡</span> Criptomonedas:
-                </span>
-                <span class="text-[10px] text-slate-500 font-mono block">24/7 (Flujo Lun-Vie)</span>
-              </div>
-              <div class="space-y-1 font-mono text-[11px]">
-                <button onclick="setAndInspectTicker('BTC-USD')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-cyan-300 font-bold">BTC</span>
-                  <span class="text-slate-400">→ Bitcoin</span>
-                </button>
-                <button onclick="setAndInspectTicker('ETH-USD')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-cyan-300 font-bold">ETH</span>
-                  <span class="text-slate-400">→ Ethereum</span>
-                </button>
-                <button onclick="setAndInspectTicker('SOL-USD')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-cyan-300 font-bold">SOL</span>
-                  <span class="text-slate-400">→ Solana</span>
-                </button>
-              </div>
+            <p id="operator-main-message">Cargando hoja de ruta operativa…</p>
+          </div>
+          <div id="operator-schedule-card" class="schedule-card">
+            <div class="schedule-heading"><div><span class="eyebrow">SESIÓN · HORA ARGENTINA UTC−3</span><h3>Estado de mercado</h3></div>
+              <span id="operator-market-badge" class="market-badge"><i id="operator-market-dot"></i><span id="operator-market-status-text">Verificando horario…</span></span>
             </div>
-
-            <!-- 3. Bonos e Índices Macro -->
-            <div class="p-3 rounded-lg bg-slate-950/80 border border-slate-800/80 space-y-2">
-              <div>
-                <span class="font-semibold text-emerald-400 flex items-center gap-1.5 text-xs">
-                  <span>🏛️</span> Bonos e Índices:
-                </span>
-                <span class="text-[10px] text-slate-500 font-mono block">Lun-Vie 10:30-17h ARG</span>
-              </div>
-              <div class="space-y-1 font-mono text-[11px]">
-                <button onclick="setAndInspectTicker('TLT')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-emerald-300 font-bold">TLT</span>
-                  <span class="text-slate-400">→ Bonos 20A</span>
-                </button>
-                <button onclick="setAndInspectTicker('^GSPC')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-emerald-300 font-bold">^GSPC</span>
-                  <span class="text-slate-400">→ S&P 500</span>
-                </button>
-                <button onclick="setAndInspectTicker('QQQ')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-emerald-300 font-bold">QQQ</span>
-                  <span class="text-slate-400">→ Nasdaq</span>
-                </button>
-              </div>
+            <div class="schedule-grid">
+              <div><small>HORARIO OFICIAL</small><strong id="operator-schedule-hours">Lunes a Viernes · 10:30–17:00 ARG</strong></div>
+              <div><small>PRÓXIMA VENTANA</small><strong id="operator-next-open">Calculando próxima sesión…</strong></div>
             </div>
-
-            <!-- 4. Acciones Globales & Tech -->
-            <div class="p-3 rounded-lg bg-slate-950/80 border border-slate-800/80 space-y-2">
-              <div>
-                <span class="font-semibold text-purple-400 flex items-center gap-1.5 text-xs">
-                  <span>🏢</span> Global & Tech:
-                </span>
-                <span class="text-[10px] text-slate-500 font-mono block">Wall St 10:30-17h ARG</span>
-              </div>
-              <div class="space-y-1 font-mono text-[11px]">
-                <button onclick="setAndInspectTicker('NVDA')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-purple-300 font-bold">NVDA</span>
-                  <span class="text-slate-400">→ Nvidia</span>
-                </button>
-                <button onclick="setAndInspectTicker('AAPL')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-purple-300 font-bold">AAPL</span>
-                  <span class="text-slate-400">→ Apple</span>
-                </button>
-                <button onclick="setAndInspectTicker('TSLA')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-purple-300 font-bold">TSLA</span>
-                  <span class="text-slate-400">→ Tesla</span>
-                </button>
-                <button onclick="setAndInspectTicker('BABA')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-purple-300 font-bold">BABA</span>
-                  <span class="text-slate-400">→ Alibaba</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- 5. Mercado Local Argentino -->
-            <div class="p-3 rounded-lg bg-slate-950/80 border border-slate-800/80 space-y-2">
-              <div>
-                <span class="font-semibold text-blue-400 flex items-center gap-1.5 text-xs">
-                  <span>🇦🇷</span> Merval Local:
-                </span>
-                <span class="text-[10px] text-slate-500 font-mono block">Lun-Vie 11:00-17h ARG</span>
-              </div>
-              <div class="space-y-1 font-mono text-[11px]">
-                <button onclick="setAndInspectTicker('GGAL')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-blue-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-blue-300 font-bold">GGAL</span>
-                  <span class="text-slate-400">→ Galicia</span>
-                </button>
-                <button onclick="setAndInspectTicker('YPFD')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-blue-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-blue-300 font-bold">YPFD</span>
-                  <span class="text-slate-400">→ YPF</span>
-                </button>
-                <button onclick="setAndInspectTicker('PAMP')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-blue-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-blue-300 font-bold">PAMP</span>
-                  <span class="text-slate-400">→ Pampa</span>
-                </button>
-                <button onclick="setAndInspectTicker('BMA')" class="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-blue-500/50 transition-colors flex justify-between cursor-pointer">
-                  <span class="text-blue-300 font-bold">BMA</span>
-                  <span class="text-slate-400">→ Macro</span>
-                </button>
-              </div>
-            </div>
+            <div id="operator-bot-warning" class="operator-warning"><span>!</span><span id="operator-bot-warning-text">El estado horario es informativo. El monitor no transmite ni ejecuta órdenes.</span></div>
+          </div>
+          <div class="checklist-card">
+            <h3><span class="eyebrow">CHECKLIST</span> Antes de actuar</h3>
+            <div id="operator-checklist" class="operator-checklist"></div>
+          </div>
+          <div class="operator-notes">
+            <div class="risk-note"><small>GESTIÓN DE RIESGO</small><p id="operator-risk-rule">Nunca arriesgues más del 1% o 2% de tu cuenta en una operación.</p></div>
+            <div class="psycho-note"><small>DISCIPLINA CONTRARIAN</small><p id="operator-psycho-advice">Mantén la calma ante titulares de pánico.</p></div>
           </div>
         </div>
-
-      </div>
-
+      </section>
     </div>
-
-    <!-- Banner de Razonamiento Interno y Conclusiones de la IA con Selector de Reportes Arriba de Todo -->
-    <div id="conclusions-box" class="glass-card rounded-xl p-5 border-amber-500/30 bg-gradient-to-r from-amber-950/15 via-[#121826] to-[#121826] space-y-4">
-      
-      <!-- 1. ARRIBA DE TODO: Selector y Filtro de Historial de Reportes -->
-      <div class="space-y-3 pb-3 border-b border-slate-800/80">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-            <span>📜</span> Historial de Reportes (Organizado por Fecha y Relevancia):
-          </h4>
-          <!-- Pestañas de Filtrado -->
-          <div class="flex items-center gap-1.5 text-xs font-mono">
-            <button id="filter-vigentes-btn" onclick="filterReportsTab('vigentes')" class="px-2.5 py-1 rounded bg-cyan-950 text-cyan-300 border border-cyan-500 font-bold transition-all cursor-pointer">
-              🟢 Vigentes (<span id="count-vigentes">0</span>)
-            </button>
-            <button id="filter-todos-btn" onclick="filterReportsTab('todos')" class="px-2.5 py-1 rounded bg-slate-900 text-slate-400 border border-slate-800 transition-all cursor-pointer">
-              📁 Historial Completo (<span id="count-todos">0</span>)
-            </button>
-          </div>
-        </div>
-
-        <!-- Lista dinámica de botones de reportes -->
-        <div id="reports-list" class="flex flex-wrap gap-2 text-xs font-mono">
-          <!-- Inyectado por JS -->
-        </div>
-
-        <!-- Banner de Estado de Vigencia y Modo del Reporte Activo -->
-        <div id="report-vigencia-banner" class="hidden p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 text-xs font-mono flex flex-wrap items-center justify-between gap-2">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-slate-400 font-bold">Viendo:</span>
-            <span id="report-active-title" class="text-white font-bold px-2 py-0.5 rounded bg-slate-900 border border-slate-700"></span>
-            <span id="report-vigencia-badge" class="px-2 py-0.5 rounded text-[11px] font-bold"></span>
-            <span id="report-mode-badge" class="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300 text-[11px]"></span>
-            <span id="report-folder-badge" class="text-slate-400 text-[11px]"></span>
-            <span id="report-age-text" class="text-slate-400 text-[11px]"></span>
-          </div>
-          <div class="flex items-center gap-2">
-            <button id="btn-delete-report" onclick="deleteActiveReport()" class="px-2.5 py-1 rounded bg-red-950/80 hover:bg-red-900 text-red-300 border border-red-700/60 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer" title="Eliminar este informe del disco">
-              <span>🗑️</span> Borrar Este Informe
-            </button>
-          </div>
-        </div>
-      </div>
-
-
-      <!-- 2. CONTENIDO DE LAS CONCLUSIONES INTERNAS -->
-      <div>
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="text-sm font-bold text-amber-400 flex items-center gap-2">
-            <span>🧠</span> Conclusiones Internas del Motor de IA (Pensamiento Obligatorio)
-          </h3>
-          <span class="text-[11px] px-2 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/40 font-mono">
-            Progreso por Etapas
-          </span>
-        </div>
-        <div id="report-directive-badge" class="hidden mb-3 p-2.5 rounded-lg bg-cyan-950/60 border border-cyan-700/60 text-xs text-cyan-300 font-mono flex items-center gap-2">
-          <span>🎯 Directiva Aplicada:</span> <strong id="report-directive-text" class="text-white font-sans"></strong>
-        </div>
-        <p id="executive-verdict" class="text-xs text-slate-300 leading-relaxed font-sans mb-3">
-          Cargando conclusiones del último ciclo de escaneo...
-        </p>
-
-        <div id="step-deductions" class="space-y-1.5 text-xs text-slate-400 font-mono border-t border-slate-800/60 pt-3">
-          <!-- Inyectado por JS -->
-        </div>
-      </div>
-
-    </div>
-
-    <!-- Nueva Ventana de Informes: Fichas de Oportunidad y Alertas de Trampas con Explicaciones -->
-    <div class="glass-card rounded-xl p-6 space-y-6 border-slate-800">
-      
-      <!-- Encabezado de la Ventana de Informes -->
-      <div class="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-800/80">
-        <div>
-          <h2 class="text-base font-bold text-white flex items-center gap-2">
-            <span>📊</span> Informes de Mercado: Oportunidades Asimétricas vs. Trampas de Euforia
-          </h2>
-          <p class="text-xs text-slate-400 mt-0.5">
-            Clasificación contrarian rigurosa. A continuación se presentan los dos tipos de informes generados por cada escaneo con su respectiva explicación operativa:
-          </p>
-        </div>
-        <span class="text-xs font-mono px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-cyan-400">
-          Auditoría de Activos
-        </span>
-      </div>
-
-      <!-- INFORME 1: FICHAS DE OPORTUNIDAD ASIMÉTRICA -->
-      <div class="space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="flex items-center gap-2">
-            <span class="w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]"></span>
-            <h3 class="text-sm font-bold text-emerald-400 uppercase tracking-wider">
-              1. Fichas de Oportunidad Asimétrica (Capitulación & Valor)
-            </h3>
-          </div>
-          <div class="flex items-center gap-3">
-            <span class="text-xs text-slate-400 font-mono">Filtro: <strong class="text-emerald-400">R/B ≥ 1:3.0</strong></span>
-            <span id="opp-count-badge" class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 font-mono font-bold">0 detectadas</span>
-          </div>
-        </div>
-
-        <!-- Explicación pedagógica del Informe 1 -->
-        <div class="p-3.5 rounded-lg bg-emerald-950/20 border border-emerald-500/20 text-xs space-y-1.5 leading-relaxed">
-          <div class="font-semibold text-emerald-300 flex items-center gap-1.5">
-            <span>ℹ️</span> ¿Qué hace este informe?
-          </div>
-          <p class="text-slate-300">
-            Detecta activos sólidos que sufren <strong>pánico mediático injustificado o capitulación</strong> donde la multitud huye. 
-            Verifica que exista <strong>soporte secular</strong> (viento de cola estructural para garantizar que no sea una quiebra) y calcula que la matemática sea favorable: arriesgar 1 para ganar al menos 3.
-          </p>
-          <div class="text-[11px] text-emerald-400/90 font-mono">
-            ✔ Entrega: Nivel de entrada sugerido, stop loss de invalidación conceptual, objetivo de precio y la tesis contrarian de por qué la masa está equivocada.
-          </div>
-        </div>
-
-        <!-- Contenedor dinámico de Cards de Oportunidad -->
-        <div id="opportunities-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          <!-- Renderizado dinámico -->
-        </div>
-      </div>
-
-      <!-- LÍNEA DIVISORIA -->
-      <div class="border-t border-slate-800/80"></div>
-
-      <!-- INFORME 2: ALERTAS DE TRAMPA DE MERCADO / PELIGRO -->
-      <div class="space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="flex items-center gap-2">
-            <span class="w-3 h-3 rounded-full bg-red-400 shadow-[0_0_10px_rgba(248,113,113,0.7)]"></span>
-            <h3 class="text-sm font-bold text-red-400 uppercase tracking-wider">
-              2. Alertas de Trampa de Mercado / Peligro (Euforia & Techos)
-            </h3>
-          </div>
-          <span id="danger-count-badge" class="text-xs px-2.5 py-0.5 rounded-full bg-red-950 text-red-400 border border-red-800 font-mono font-bold">0 activas</span>
-        </div>
-
-        <!-- Explicación pedagógica del Informe 2 -->
-        <div class="p-3.5 rounded-lg bg-red-950/20 border border-red-500/20 text-xs space-y-1.5 leading-relaxed">
-          <div class="font-semibold text-red-300 flex items-center gap-1.5">
-            <span>⚠️</span> ¿Qué hace este informe?
-          </div>
-          <p class="text-slate-300">
-            Alerta sobre activos sobrecalentados donde la masa mediática está comprando por <strong>euforia desmedida o FOMO</strong> en techos de mercado. 
-            Aplica la opinión contraria para advertir que el ratio riesgo/beneficio es pésimo y que el público está actuando como liquidez de salida para los grandes participantes.
-          </p>
-          <div class="text-[11px] text-red-400/90 font-mono">
-            ✔ Entrega: Advertencia de sobrecompra, diagnóstico del hype mediático y recomendación explícita de evitar entradas o asegurar ganancias.
-          </div>
-        </div>
-
-        <!-- Contenedor dinámico de Cards de Trampa -->
-        <div id="dangers-container" class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <!-- Renderizado dinámico -->
-        </div>
-      </div>
-
-      <!-- LÍNEA DIVISORIA -->
-      <div class="border-t border-slate-800/80"></div>
-
-      <!-- INFORME 3: HOJA DE RUTA DEL OPERADOR (GUÍA PASO A PASO PARA NOVATOS) -->
-      <div class="space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="flex items-center gap-2">
-            <span class="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.8)]"></span>
-            <h3 class="text-sm font-bold text-cyan-400 uppercase tracking-wider">
-              3. Hoja de Ruta del Operador (¿Qué debo hacer yo hoy paso a paso?)
-            </h3>
-          </div>
-          <span id="operator-semaphore-badge" class="text-xs px-3 py-1 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800 font-mono font-bold flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-            <span id="operator-semaphore-text">Calculando estado...</span>
-          </span>
-        </div>
-
-        <!-- Explicación pedagógica del Informe 3 -->
-        <div class="p-3.5 rounded-lg bg-cyan-950/20 border border-cyan-500/20 text-xs space-y-1.5 leading-relaxed">
-          <div class="font-semibold text-cyan-300 flex items-center gap-1.5">
-            <span>🧭</span> ¿Qué hace este informe?
-          </div>
-          <p class="text-slate-300">
-            Diseñado especialmente para <strong>operadores principiantes</strong>. Traduce todas las noticias, números y conclusiones del motor a una <strong>instrucción clara y práctica en español cotidiano</strong>. Te dice con exactitud si debes quedarte quieto en liquidez o cómo colocar una orden de compra defensiva sin correr riesgos desmedidos.
-          </p>
-          <div class="text-[11px] text-cyan-400/90 font-mono">
-            ✔ Entrega: Semáforo de decisión, checklist de botones/órdenes a ejecutar, regla de oro de supervivencia (máx 1% de riesgo) y traducción mental contrarian.
-          </div>
-        </div>
-
-        <!-- Contenedor del Plan Operativo -->
-        <div id="operator-guide-container" class="space-y-4">
-          <!-- Tarjeta de Mensaje Principal y Semáforo -->
-          <div class="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <div class="flex items-center gap-2">
-                <span class="text-base">📢</span>
-                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300">Instrucción Operativa para Hoy:</h4>
-              </div>
-              <div class="flex items-center gap-2 flex-wrap">
-                <button id="btn-copy-macro" onclick="copyMacroInstruction()" class="px-2.5 py-1.5 rounded-lg bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-700/60 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all cursor-pointer">
-                  <span>📋</span>
-                  <span id="copy-macro-text">Copiar para Contexto Macro</span>
-                </button>
-                <button id="btn-inject-macro" onclick="openInjectModal()" class="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-400 text-white font-bold text-xs shadow-[0_0_15px_rgba(16,185,129,0.35)] border border-emerald-400/50 flex items-center gap-1.5 transition-all cursor-pointer transform hover:scale-[1.02] active:scale-[0.98]">
-                  <span>🚀</span>
-                  <span>INYECTAR TESIS A TRADING OLLAMA</span>
-                </button>
-              </div>
-            </div>
-            <p id="operator-main-message" class="text-sm text-white font-medium leading-relaxed pl-3 border-l-2 border-cyan-500">
-              Cargando hoja de ruta operativa...
-            </p>
-          </div>
-
-          <!-- Tarjeta de Estado y Horarios de Mercado (Anti-Datos Obsoletos y Anti-Gap) -->
-          <div id="operator-schedule-card" class="p-4 rounded-xl bg-slate-950/90 border border-slate-800/80 space-y-3">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <div class="flex items-center gap-2">
-                <span class="text-base">🕒</span>
-                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300">Inteligencia de Horarios & Apertura (Hora Argentina UTC-3):</h4>
-              </div>
-              <span id="operator-market-badge" class="px-2.5 py-1 rounded text-xs font-mono font-bold flex items-center gap-1.5 bg-slate-900 text-slate-300 border border-slate-700">
-                <span id="operator-market-dot" class="w-2 h-2 rounded-full bg-slate-400"></span>
-                <span id="operator-market-status-text">Verificando horario...</span>
-              </span>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
-              <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1">
-                <span class="text-slate-400 block text-[11px]">Categoría & Horario Oficial:</span>
-                <div id="operator-schedule-hours" class="text-white font-bold">Lunes a Viernes de 10:30 AM a 17:00 PM ARG</div>
-              </div>
-              <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1">
-                <span class="text-slate-400 block text-[11px]">Próxima Apertura / Ventana Operativa:</span>
-                <div id="operator-next-open" class="text-cyan-400 font-bold">Calculando próxima sesión...</div>
-              </div>
-            </div>
-
-            <div id="operator-bot-warning" class="text-xs p-3 rounded-lg bg-amber-950/30 border border-amber-800/40 text-amber-200/90 leading-relaxed font-sans flex items-start gap-2">
-              <span class="text-amber-400 font-bold text-sm shrink-0">⚠️</span>
-              <span id="operator-bot-warning-text">
-                Si operas con un bot cuantitativo o trading algorítmico: espera a que el mercado abra para evitar que el bot rechace la orden por "datos obsoletos" (antigüedad > 2700s) o asumas riesgo de salto de precio (gap).
-              </span>
-            </div>
-          </div>
-
-          <!-- Checklist de Pasos a Ejecutar -->
-          <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2.5">
-            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-              <span>📋</span> Pasos Concretos a Seguir (Checklist):
-            </h4>
-            <div id="operator-checklist" class="space-y-2 text-xs font-mono text-slate-300">
-              <!-- Inyectado por JS -->
-            </div>
-          </div>
-
-          <!-- Regla de Gestión de Riesgo y Consejo Psicológico -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="p-3.5 rounded-lg bg-emerald-950/30 border border-emerald-800/60 space-y-1.5">
-              <div class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                <span>🛡️</span> Regla de Supervivencia (Gestión de Riesgo):
-              </div>
-              <p id="operator-risk-rule" class="text-xs text-slate-300 leading-relaxed font-sans">
-                REGLA DEL 1%: Nunca arriesgues más del 1% o 2% de tu cuenta total en una sola operación.
-              </p>
-            </div>
-
-            <div class="p-3.5 rounded-lg bg-purple-950/30 border border-purple-800/60 space-y-1.5">
-              <div class="text-xs font-bold text-purple-400 flex items-center gap-1.5">
-                <span>🧠</span> Traductor Psicológico de Noticias:
-              </div>
-              <p id="operator-psycho-advice" class="text-xs text-slate-300 leading-relaxed font-sans">
-                Mantén la calma ante los titulares de pánico. El pánico de la multitud es el que crea el descuento.
-              </p>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-    </div>
-
-
   </main>
 
-  <!-- Footer -->
-  <footer class="border-t border-slate-800/80 bg-[#0d131f] text-slate-500 text-xs py-4 px-6 text-center">
-    Monitor del Mercado — Sistema 100% Independiente de Investigación Financiera y Asimetría Contrarian.
-  </footer>
+  <footer class="terminal-footer"><span>MONITOR DEL MERCADO</span><span>Investigación financiera independiente · No ejecuta órdenes</span></footer>
 
-  <!-- Modal: Inyectar Directiva a Trading Ollama -->
-  <div id="inject-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
-    <div class="bg-slate-900 border border-cyan-500/50 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 text-slate-200 animate-in fade-in zoom-in-95 duration-150">
-      
-      <!-- Encabezado Modal -->
-      <div class="flex items-start justify-between border-b border-slate-800 pb-3">
-        <div class="flex items-center gap-2.5">
-          <div class="w-9 h-9 rounded-xl bg-cyan-950/80 border border-cyan-500/40 flex items-center justify-center text-lg">
-            📡
-          </div>
-          <div>
-            <h3 class="text-sm font-bold text-white tracking-wide">Puente Táctico: Inyectar Directiva a Trading Ollama</h3>
-            <p class="text-[11px] text-cyan-400/80 font-mono">Destino: http://127.0.0.1:18767/api/macro/inject</p>
-          </div>
-        </div>
-        <button onclick="closeInjectModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors text-lg leading-none cursor-pointer">✕</button>
+  <div id="inject-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title" onclick="if(event.target === this) closeInjectModal()">
+    <div class="modal-dialog">
+      <div class="modal-heading"><div><span class="eyebrow">PUENTE TÁCTICO · PUERTO 18767</span><h2 id="modal-title">Inyectar directiva</h2></div><button type="button" onclick="closeInjectModal()" class="icon-button" aria-label="Cerrar">×</button></div>
+      <p class="modal-endpoint">Destino: http://127.0.0.1:18767/api/macro/inject</p>
+      <div class="modal-summary">
+        <div><small>ACTIVO</small><strong id="modal-inject-asset">TLT</strong></div>
+        <div><small>SEÑAL</small><strong id="modal-inject-type">Oportunidad</strong></div>
+        <div><small>CONFIANZA</small><strong id="modal-inject-conf">85%</strong></div>
       </div>
-
-      <!-- Resumen de Carga Útil (Payload) -->
-      <div class="space-y-3 text-xs">
-        <div class="grid grid-cols-3 gap-2 font-mono">
-          <div class="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
-            <span class="text-slate-400 block text-[10px]">Activo / Ticker</span>
-            <span id="modal-inject-asset" class="text-emerald-400 font-bold text-sm">TLT</span>
-          </div>
-          <div class="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
-            <span class="text-slate-400 block text-[10px]">Tipo de Señal</span>
-            <span id="modal-inject-type" class="text-cyan-400 font-bold text-sm">Oportunidad</span>
-          </div>
-          <div class="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
-            <span class="text-slate-400 block text-[10px]">Confianza / Score</span>
-            <span id="modal-inject-conf" class="text-amber-400 font-bold text-sm">85%</span>
-          </div>
-        </div>
-
-        <!-- Estado de Mercado del Activo -->
-        <div id="modal-inject-market-banner" class="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 text-[11px] flex items-center justify-between font-mono">
-          <span class="text-slate-400">Estado Mercado:</span>
-          <span id="modal-inject-market-status" class="font-bold text-slate-300">Verificando...</span>
-        </div>
-
-        <!-- Vista Previa de la Directiva que se Inyectará -->
-        <div class="space-y-1">
-          <div class="flex justify-between items-center text-[11px]">
-            <span class="text-slate-400 font-semibold">Tesis & Contexto Macro a Transmitir:</span>
-            <span class="text-slate-500 font-mono text-[10px]">JSON Payload</span>
-          </div>
-          <textarea id="modal-inject-text" rows="4" class="w-full bg-slate-950 border border-slate-700/80 rounded-lg p-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500 leading-relaxed"></textarea>
-        </div>
-
-        <!-- Explicación Didáctica -->
-        <div class="p-3 rounded-lg bg-cyan-950/20 border border-cyan-800/40 text-[11px] text-cyan-200/90 leading-relaxed space-y-1">
-          <div class="font-bold flex items-center gap-1.5 text-cyan-300">
-            <span>ℹ️</span> ¿Qué ocurrirá al confirmar?
-          </div>
-          <p class="text-slate-300">
-            1. Se enviará este paquete vía POST al endpoint de <strong>Trading Ollama</strong>.<br>
-            2. Tu bot de trading registrará en su bitácora: <em>"🌐 [MONITOR DEL MERCADO] Directiva recibida..."</em>.<br>
-            3. La tarjeta se dibujará en su <strong>Radar de Oportunidades</strong> y se cargará en su <strong>Contexto Macro</strong> para que Qwen lo evalúe con datos en vivo.
-          </p>
-        </div>
-
-        <!-- Feedback de Envío (Alertas de Éxito / Error) -->
-        <div id="modal-inject-feedback" class="hidden text-xs p-3 rounded-lg font-mono"></div>
-      </div>
-
-      <!-- Acciones -->
-      <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
-        <button onclick="closeInjectModal()" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer">
-          Cancelar
-        </button>
-        <button id="btn-modal-confirm-inject" onclick="confirmInjection()" class="px-5 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-bold text-xs shadow-[0_0_15px_rgba(16,185,129,0.4)] border border-emerald-400/50 flex items-center gap-2 transition-all cursor-pointer">
-          <span>🚀</span>
-          <span id="modal-confirm-text">Confirmar e Inyectar</span>
-        </button>
-      </div>
-
+      <div id="modal-inject-market-banner" class="modal-market"><span>Estado de mercado</span><strong id="modal-inject-market-status">Verificando…</strong></div>
+      <label class="field-label" for="modal-inject-text">Tesis & contexto a transmitir</label>
+      <textarea id="modal-inject-text" rows="5"></textarea>
+      <div id="modal-inject-feedback" class="modal-feedback hidden"></div>
+      <p class="modal-disclaimer">La directiva se enviará al endpoint local de Trading Ollama. Revisa la recepción en la bitácora del bot; este monitor no envía órdenes.</p>
+      <div class="modal-actions"><button type="button" onclick="closeInjectModal()" class="secondary-button">Cancelar</button><button id="btn-modal-confirm-inject" onclick="confirmInjection()" class="inject-button"><span>↗</span><span id="modal-confirm-text">Confirmar e inyectar</span></button></div>
     </div>
   </div>
-
   <script src="/app.js"></script>
 </body>
 </html>

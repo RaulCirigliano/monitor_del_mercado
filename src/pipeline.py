@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Dict, List, Optional
 from rich.console import Console
 
@@ -12,14 +13,42 @@ console = Console()
 class MarketMonitorPipeline:
     """Orquestador completo del flujo de investigación y evaluación contrarian."""
 
-    # Tickers de referencia macro para poner en contexto el mercado
-    BENCHMARK_TICKERS = ["^GSPC", "CL=F", "GC=F", "BTC-USD", "TLT"]
+    # Tickers referentes del universo operable de trading_ollama (se completan bajo demanda según noticias)
+    KEY_TICKERS = [
+        "^GSPC",
+        "SPY",
+        "QQQ",
+        "CL=F",
+        "GC=F",
+        "BTC-USD",
+        "TLT",
+        "NVDA",
+        "BABA",
+        "YPFD.BA",
+        "GGAL.BA",
+    ]
+    BENCHMARK_TICKERS = KEY_TICKERS
 
     def __init__(self, use_gemini: bool = False):
         self.collector = RSSCollector()
         self.market_fetcher = MarketDataFetcher()
         self.evaluator = ContrarianEvaluator(use_gemini=use_gemini)
         self.report_generator = MarkdownReportGenerator()
+
+    @classmethod
+    def _ordered_tickers(cls, news_items: List[NewsItem], limit: int = 15) -> List[str]:
+        ordered = []
+        seen = set()
+        for item in news_items:
+            for ticker in item.tickers_detected:
+                if ticker not in seen:
+                    seen.add(ticker)
+                    ordered.append(ticker)
+        for ticker in cls.KEY_TICKERS:
+            if ticker not in seen:
+                seen.add(ticker)
+                ordered.append(ticker)
+        return ordered[:limit]
 
     def run(
         self,
@@ -44,25 +73,24 @@ class MarketMonitorPipeline:
         if not news_items:
             console.print("[yellow]No se encontraron noticias recientes o no superaron los filtros de descarte.[/yellow]")
             batch = AnalysisBatch(
-                timestamp="",
+                timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 total_noticias_analizadas=0,
                 total_ruido_descartado=0,
                 oportunidades=[],
                 alertas_peligro=[],
                 directiva_personalizada=custom_directive,
             )
+            report_path = self.report_generator.generate_report(batch)
+            TerminalViewer.show_report_saved(report_path)
             return batch
 
         # 2. Extracción y consulta de tickers
-        detected_tickers = set(self.BENCHMARK_TICKERS)
-        for item in news_items:
-            for t in item.tickers_detected:
-                detected_tickers.add(t)
+        detected_tickers = self._ordered_tickers(news_items)
 
         snapshots: Dict[str, AssetSnapshot] = {}
-        with console.status(f"[bold green]Consultando cotizaciones de {len(detected_tickers)} activos en yfinance...", spinner="dots"):
+        with console.status(f"[bold green]Consultando cotizaciones de {min(len(detected_tickers), 15)} activos en yfinance...", spinner="dots"):
             # Consultamos un límite razonable de tickers para no saturar
-            for t in list(detected_tickers)[:15]:
+            for t in detected_tickers[:15]:
                 snap = self.market_fetcher.get_snapshot(t)
                 if snap:
                     snapshots[t] = snap
@@ -97,4 +125,3 @@ class MarketMonitorPipeline:
         TerminalViewer.show_report_saved(report_path)
 
         return batch
-

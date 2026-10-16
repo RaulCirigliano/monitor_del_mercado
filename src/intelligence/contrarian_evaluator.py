@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 from typing import Dict, List, Optional, Any
 import logging
 
@@ -52,11 +53,19 @@ class ContrarianEvaluator:
         """Ejecuta una llamada protegida por tiempo y tokens."""
         call_timeout = timeout or self.STEP_TIMEOUT
 
-        if self.use_gemini and self.gemini.is_available():
-            try:
-                return self.gemini.generate_json(system_prompt, user_prompt)
-            except Exception as e:
-                logger.warning(f"Fallback desde Gemini a Ollama local: {e}")
+        if self.use_gemini:
+            if self.gemini.is_available():
+                try:
+                    return self.gemini.generate_json(system_prompt, user_prompt)
+                except Exception as e:
+                    logger.warning(
+                        "Gemini falló (%s); se intentará Ollama local.",
+                        type(e).__name__,
+                    )
+            else:
+                logger.warning(
+                    "Gemini fue solicitado pero no está configurado; se intentará Ollama local."
+                )
 
         if not self.ollama.is_available():
             raise RuntimeError(f"Ollama no disponible en {self.ollama.host}")
@@ -68,6 +77,68 @@ class ContrarianEvaluator:
             timeout=call_timeout,
         )
 
+    @staticmethod
+    def _compute_atr_levels(snapshot: AssetSnapshot) -> Optional[Dict[str, Any]]:
+        """Calcula determinísticamente en Python niveles de entrada, stop loss y take profit basados en ATR(14)."""
+        if snapshot is None or snapshot.current_price is None or snapshot.current_price <= 0:
+            return None
+
+        price = float(snapshot.current_price)
+        currency = snapshot.currency or "USD"
+        atr = (
+            float(snapshot.atr_14)
+            if (snapshot.atr_14 is not None and snapshot.atr_14 > 0)
+            else max(price * 0.025, 0.01)
+        )
+
+        entry_low = round(max(0.01, price - 0.5 * atr), 2)
+        entry_high = round(price, 2)
+        entry_mid = (entry_low + entry_high) / 2.0
+
+        stop_price = round(max(0.01, entry_mid - 2.0 * atr), 2)
+        if stop_price >= entry_mid:
+            stop_price = round(max(0.01, entry_mid * 0.94), 2)
+
+        risk = max(entry_mid - stop_price, 0.01)
+        target_price = round(entry_mid + max(6.4 * atr, 3.2 * risk), 2)
+        rr_ratio = round((target_price - entry_mid) / risk, 2)
+
+        return {
+            "entry_price_range": f"{entry_low:.2f} - {entry_high:.2f} {currency}",
+            "stop_loss": f"{stop_price:.2f} {currency}",
+            "take_profit": f"{target_price:.2f} {currency}",
+            "risk_reward_ratio": rr_ratio,
+        }
+
+    def _format_market_context(
+        self,
+        snapshots_or_snap: Any,
+        relevant_tickers: Optional[set] = None,
+    ) -> str:
+        """Formatea el contexto cuantitativo duro (Z-Score, EMA200, ATR%, RVOL) y niveles deterministas."""
+        if isinstance(snapshots_or_snap, AssetSnapshot):
+            base = snapshots_or_snap.to_compact_text()
+            levels = self._compute_atr_levels(snapshots_or_snap)
+            if levels:
+                base += (
+                    f" | Niveles ATR(14) sugeridos -> Entrada: {levels['entry_price_range']}, "
+                    f"Stop Loss (-2x ATR): {levels['stop_loss']}, "
+                    f"Target: {levels['take_profit']} (R/B: {levels['risk_reward_ratio']})"
+                )
+            return base
+
+        if isinstance(snapshots_or_snap, dict):
+            benchmarks = {"CL=F", "GC=F", "BTC-USD", "^GSPC", "SPY", "TLT"}
+            chunk_snaps = []
+            for t, s in snapshots_or_snap.items():
+                if not isinstance(s, AssetSnapshot):
+                    continue
+                if relevant_tickers is None or t in relevant_tickers or t in benchmarks:
+                    chunk_snaps.append(self._format_market_context(s))
+            return "\n".join(chunk_snaps[:6]) if chunk_snaps else "Sin cotizaciones específicas."
+
+        return "Sin cotizaciones específicas."
+
     def _step1_diagnose(
         self,
         news_chunk: List[NewsItem],
@@ -77,40 +148,50 @@ class ContrarianEvaluator:
         """Paso 1: Emite obligatoriamente una conclusión interna y detecta candidatos o ruido."""
         news_text = "\n\n".join(item.to_compact_text() for item in news_chunk)
 
-        # Contexto de mercado acotado
+        # Contexto de mercado acotado con métricas cuantitativas
         relevant_tickers = set()
         for item in news_chunk:
             for t in item.tickers_detected:
                 relevant_tickers.add(t)
 
-        chunk_snaps = [
-            s.to_compact_text()
-            for t, s in snapshots.items()
-            if t in relevant_tickers or t in ["CL=F", "GC=F", "BTC-USD", "^GSPC", "TLT"]
-        ]
-        market_text = "\n".join(chunk_snaps[:4]) if chunk_snaps else "Sin cotizaciones específicas."
+        market_text = self._format_market_context(snapshots, relevant_tickers=relevant_tickers)
 
         prompt = build_step1_prompt(news_text, market_text, custom_directive=custom_directive)
 
         try:
-            return self._call_llm(
+            result = self._call_llm(
                 system_prompt=STEP1_DIAGNOSIS_SYSTEM,
                 user_prompt=prompt,
                 max_tokens=300,
                 timeout=self.STEP_TIMEOUT,
             )
-        except (TimeoutError, ValueError, Exception) as e:
-            # Conclusión forzada si el modelo agota el tiempo: no se bloquea ni se pierde
-            logger.warning(f"Paso 1 timeout o error ({e}), sintetizando conclusión interna de contingencia.")
+            if not isinstance(result, dict):
+                raise ValueError("La respuesta de diagnóstico no es un objeto JSON.")
+            conclusion = result.get("conclusion_interna")
+            noise_count = result.get("ruido_descartado_count")
+            if not isinstance(conclusion, str) or not conclusion.strip():
+                raise ValueError("La respuesta de diagnóstico no incluye una conclusión válida.")
+            if not isinstance(noise_count, int) or isinstance(noise_count, bool):
+                raise ValueError("La respuesta de diagnóstico no incluye un recuento de ruido válido.")
+            for candidate_key in ("candidato_oportunidad", "candidato_peligro"):
+                candidate = result.get(candidate_key)
+                if candidate is not None and not isinstance(candidate, str):
+                    raise ValueError(f"El campo {candidate_key} tiene un formato inválido.")
+            return result
+        except Exception as e:
+            logger.warning(
+                "No se pudo completar el diagnóstico de IA (%s).",
+                type(e).__name__,
+            )
             return {
                 "conclusion_interna": (
-                    f"Filtro preventivo activado: se procesaron {len(news_chunk)} noticias. "
-                    "Contenido clasificado como ruido mediático transitorio sin capitulación estructural confirmada."
+                    f"Evaluación incompleta: no se pudieron clasificar {len(news_chunk)} noticias "
+                    "porque el servicio de IA no respondió correctamente."
                 ),
-                "ruido_descartado_count": len(news_chunk),
+                "ruido_descartado_count": 0,
                 "candidato_oportunidad": None,
                 "candidato_peligro": None,
-                "motivo_clave": "Descarte por límite de tiempo y disciplina de capital",
+                "evaluacion_incompleta": True,
             }
 
     def _step2_build_card(
@@ -119,21 +200,79 @@ class ContrarianEvaluator:
         prior_conclusion: str,
         snapshot: Optional[AssetSnapshot],
         custom_directive: Optional[str] = None,
+        danger: bool = False,
     ) -> Optional[OpportunityCard]:
-        """Paso 2: Genera la Ficha Estructurada final partiendo de la conclusión previa."""
-        market_info = snapshot.to_compact_text() if snapshot else f"Activo: {ticker}"
-        prompt = build_step2_opportunity_prompt(
-            ticker, prior_conclusion, market_info, custom_directive=custom_directive
-        )
+        """Genera y valida una ficha de oportunidad o alerta de peligro."""
+        market_info = self._format_market_context(snapshot) if snapshot else f"Activo: {ticker}"
+        prompt_builder = build_step2_danger_prompt if danger else build_step2_opportunity_prompt
+        system_prompt = STEP2_DANGER_SYSTEM if danger else STEP2_OPPORTUNITY_SYSTEM
+        expected_type = "Trampa de Mercado / Peligro" if danger else "Oportunidad Asimétrica"
+        prompt = prompt_builder(ticker, prior_conclusion, market_info, custom_directive=custom_directive)
 
         try:
-            data = self._call_llm(
-                system_prompt=STEP2_OPPORTUNITY_SYSTEM,
+            raw_data = self._call_llm(
+                system_prompt=system_prompt,
                 user_prompt=prompt,
                 max_tokens=400,
                 timeout=self.STEP_TIMEOUT,
             )
+            if not isinstance(raw_data, dict):
+                raise ValueError("La ficha devuelta por el LLM no es un diccionario")
+
+            data = dict(raw_data)
+            det_levels = self._compute_atr_levels(snapshot) if (snapshot and not danger) else None
+
+            if det_levels:
+                if not data.get("nivel_entrada_sugerido"):
+                    data["nivel_entrada_sugerido"] = det_levels["entry_price_range"]
+                if not data.get("stop_loss_sugerido"):
+                    data["stop_loss_sugerido"] = det_levels["stop_loss"]
+                if not data.get("target_proyectado"):
+                    data["target_proyectado"] = det_levels["take_profit"]
+                try:
+                    rr_val = float(data.get("ratio_riesgo_beneficio", 0))
+                except (TypeError, ValueError):
+                    rr_val = 0.0
+                if rr_val <= 0:
+                    data["ratio_riesgo_beneficio"] = det_levels["risk_reward_ratio"]
+
             card = OpportunityCard.model_validate(data)
+            if card.tipo != expected_type or card.ticker.strip().upper() != ticker.strip().upper():
+                raise ValueError("La ficha no coincide con el tipo o ticker solicitado")
+
+            if not danger:
+                entry_values = self._extract_prices(card.nivel_entrada_sugerido or "")
+                stop_values = self._extract_prices(card.stop_loss_sugerido or "")
+                target_values = self._extract_prices(card.target_proyectado or "")
+
+                levels_valid = False
+                if entry_values and stop_values and target_values:
+                    entry = sum(entry_values[:2]) / min(len(entry_values), 2)
+                    stop = stop_values[0]
+                    target = target_values[0]
+                    if 0 < stop < entry < target:
+                        computed_rr = round((target - entry) / (entry - stop), 2)
+                        if computed_rr >= settings.min_risk_reward_ratio or det_levels is None:
+                            card.ratio_riesgo_beneficio = computed_rr
+                            levels_valid = True
+
+                if not levels_valid:
+                    if det_levels is not None:
+                        card.nivel_entrada_sugerido = det_levels["entry_price_range"]
+                        card.stop_loss_sugerido = det_levels["stop_loss"]
+                        card.target_proyectado = det_levels["take_profit"]
+                        card.ratio_riesgo_beneficio = det_levels["risk_reward_ratio"]
+                    else:
+                        raise ValueError("Los niveles para una posición larga deben cumplir stop < entrada < objetivo")
+
+            if snapshot is not None:
+                card.rsi_14 = snapshot.rsi_14
+                card.z_score_20 = snapshot.z_score_20
+                card.pct_from_52w_high = snapshot.pct_from_52w_high
+                card.ema_200 = snapshot.ema_200
+                card.atr_pct = snapshot.atr_pct
+                card.rvol_20 = snapshot.rvol_20
+
             sch = MarketSchedule.check_status(ticker)
             card.horario_mercado = sch.get("horario_argentina")
             card.mercado_abierto = sch.get("mercado_abierto")
@@ -142,10 +281,25 @@ class ContrarianEvaluator:
             return card
         except Exception as e:
             logger.warning(
-                f"No se pudo generar ficha validada por IA para {ticker}: {e}. "
-                "Descartado estrictamente para evitar generar datos inventados o alucinaciones."
+                "No se pudo validar una ficha de IA para %s (%s); se descartó para evitar datos inventados.",
+                ticker,
+                type(e).__name__,
             )
             return None
+
+    @staticmethod
+    def _extract_prices(value: str) -> List[float]:
+        """Extrae precios positivos en notación decimal con punto o miles separados por coma."""
+        matches = re.findall(r"(?<![\w.])(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?", value)
+        prices = []
+        for match in matches:
+            try:
+                price = float(match.replace(",", ""))
+            except ValueError:
+                continue
+            if price > 0:
+                prices.append(price)
+        return prices
 
     def evaluate(
         self,
@@ -173,7 +327,9 @@ class ContrarianEvaluator:
         valid_opportunities: List[OpportunityCard] = []
         valid_dangers: List[OpportunityCard] = []
         total_ruido = 0
-        seen_tickers = set()
+        evaluacion_incompleta = False
+        seen_opportunity_tickers = set()
+        seen_danger_tickers = set()
 
         # Procesamiento secuencial en micro-lotes con tiempo acotado
         for i in range(0, len(news_items), chunk_size):
@@ -181,34 +337,81 @@ class ContrarianEvaluator:
 
             # FASE 1: Pensamiento y Conclusión Interna Obligatoria
             diag = self._step1_diagnose(chunk, snapshots, custom_directive=custom_directive)
+            if not isinstance(diag, dict):
+                diag = {
+                    "conclusion_interna": (
+                        f"Evaluación incompleta: no se pudieron clasificar {len(chunk)} noticias "
+                        "por una respuesta inválida del servicio de IA."
+                    ),
+                    "ruido_descartado_count": 0,
+                    "evaluacion_incompleta": True,
+                }
             concl = diag.get("conclusion_interna", "")
             if concl:
                 conclusiones_internas.append(concl)
+            lote_incompleto = bool(diag.get("evaluacion_incompleta"))
+            evaluacion_incompleta = evaluacion_incompleta or lote_incompleto
 
-            total_ruido += diag.get("ruido_descartado_count", len(chunk))
+            try:
+                noise_count = int(diag.get("ruido_descartado_count", 0))
+            except (TypeError, ValueError):
+                noise_count = 0
+            total_ruido += max(0, min(len(chunk), noise_count))
+            if lote_incompleto:
+                continue
             cand_op = diag.get("candidato_oportunidad")
+            cand_danger = diag.get("candidato_peligro")
 
             # FASE 2: Progresión selectiva desde la conclusión previa
-            if cand_op and cand_op not in seen_tickers and cand_op.strip().upper() != "NULL":
+            if (
+                isinstance(cand_op, str)
+                and cand_op.strip()
+                and cand_op.strip().upper() != "NULL"
+                and cand_op.strip().upper() not in seen_opportunity_tickers
+            ):
                 cand_ticker = cand_op.strip().upper()
-                seen_tickers.add(cand_ticker)
+                seen_opportunity_tickers.add(cand_ticker)
                 card = self._step2_build_card(
                     cand_ticker, concl, snapshots.get(cand_ticker), custom_directive=custom_directive
                 )
                 if card and card.ratio_riesgo_beneficio >= settings.min_risk_reward_ratio:
                     valid_opportunities.append(card)
 
+            if (
+                isinstance(cand_danger, str)
+                and cand_danger.strip()
+                and cand_danger.strip().upper() != "NULL"
+                and cand_danger.strip().upper() not in seen_danger_tickers
+            ):
+                danger_ticker = cand_danger.strip().upper()
+                seen_danger_tickers.add(danger_ticker)
+                card = self._step2_build_card(
+                    danger_ticker,
+                    concl,
+                    snapshots.get(danger_ticker),
+                    custom_directive=custom_directive,
+                    danger=True,
+                )
+                if card:
+                    valid_dangers.append(card)
+
         # FASE 3: Síntesis final obligatoria consolidada
-        if conclusiones_internas:
+        if evaluacion_incompleta:
+            sintesis = (
+                "Evaluación incompleta: al menos un lote de noticias no pudo ser analizado "
+                "por el servicio de IA. Los resultados no representan una clasificación completa."
+            )
+        elif conclusiones_internas:
             sintesis = " | ".join(conclusiones_internas[:3])
         else:
-            sintesis = "Filtrado completado con 100% de descarte por ausencia de asimetría matemática comprobable."
-
-        total_ruido = max(0, min(len(news_items), len(news_items) - len(valid_opportunities) - len(valid_dangers)))
+            sintesis = "No se pudo generar una conclusión de mercado para este ciclo."
 
         # FASE 4: Hoja de Ruta Práctica para el Operador Novato
         guia_operador = self._build_operator_guide(
-            valid_opportunities, valid_dangers, custom_directive=custom_directive
+            valid_opportunities,
+            valid_dangers,
+            custom_directive=custom_directive,
+            analysis_incomplete=evaluacion_incompleta,
         )
 
         return AnalysisBatch(
@@ -228,8 +431,31 @@ class ContrarianEvaluator:
         opportunities: List[OpportunityCard],
         dangers: List[OpportunityCard],
         custom_directive: Optional[str] = None,
+        analysis_incomplete: bool = False,
     ) -> GuiaOperador:
         """Construye una hoja de ruta con instrucciones paso a paso y verificación de horarios de mercado en tiempo real."""
+        if analysis_incomplete and not opportunities and not dangers:
+            sch_general = MarketSchedule.check_status("SPY")
+            return GuiaOperador(
+                estado_semaforo="ESPERAR / NO OPERAR",
+                mensaje_principal=(
+                    "La evaluación quedó incompleta porque el servicio de IA no respondió. "
+                    "Las noticias no clasificadas no se consideran ruido ni evidencia de ausencia de oportunidades."
+                ),
+                checklist_pasos=[
+                    "No se generó una conclusión de mercado; vuelve a intentar el análisis cuando la IA esté disponible."
+                ],
+                regla_gestion_riesgo=(
+                    "Este resultado no es una señal de mercado. El monitor no envía ni ejecuta órdenes."
+                ),
+                consejo_psicologico="No tomes decisiones basadas en una evaluación incompleta.",
+                horario_mercado=sch_general["horario_argentina"],
+                mercado_abierto=sch_general["mercado_abierto"],
+                proxima_apertura=sch_general["proxima_apertura"],
+                categoria_mercado=sch_general["categoria"],
+                recomendacion_horaria=sch_general["recomendacion_horaria"],
+            )
+
         if opportunities:
             opp = opportunities[0]
             ticker = opp.ticker
@@ -242,26 +468,26 @@ class ContrarianEvaluator:
                 mensaje_horario = (
                     f"🟢 MERCADO ABIERTO EN VIVO ({sch['categoria']}): "
                     f"Horario oficial {sch['horario_argentina']}. "
-                    f"El mercado recibe volumen y velas frescas; puedes enviar órdenes u operar con tu bot en tiempo real."
+                    "El horario solo aporta contexto informativo; el monitor no envía ni ejecuta órdenes."
                 )
-                paso1 = f"1. LOCALIZA EL ACTIVO ({sch['estado_texto']}): Abre tu broker o plataforma. El mercado para '{ticker}' ({opp.asset_name}) está ABIERTO ({sch['horario_argentina']}) con liquidez viva."
+                paso1 = f"1. REFERENCIA DE MERCADO ({sch['estado_texto']}): '{ticker}' ({opp.asset_name}) cotiza en horario de sesión ({sch['horario_argentina']}); este dato es informativo."
             else:
                 mensaje_horario = (
                     f"⚠️ ATENCIÓN HORARIO ({sch['estado_texto']}): "
                     f"El mercado físico de {ticker} ({sch['categoria']}) opera de {sch['horario_argentina']}. "
-                    f"Actualmente está CERRADO. No dispares órdenes a tu bot de trading ahora para evitar rechazos por datos obsoletos y riesgo de salto de precio (gap). "
-                    f"Deja preparada tu tesis en el contexto macro y ejecuta a partir de la apertura: {sch['proxima_apertura']}."
+                    f"Actualmente está CERRADO; las cotizaciones pueden estar desactualizadas. "
+                    f"Próxima apertura estimada: {sch['proxima_apertura']}. El monitor no transmite ni ejecuta órdenes."
                 )
                 paso1 = (
-                    f"1. ESPERA A LA APERTURA ({sch['estado_texto']}): El mercado de {ticker} opera de {sch['horario_argentina']}. "
-                    f"Actualmente está cerrado. Próxima apertura operativa: {sch['proxima_apertura']}."
+                    f"1. CONTEXTO HORARIO ({sch['estado_texto']}): {ticker} cotiza de {sch['horario_argentina']}; "
+                    f"próxima apertura estimada: {sch['proxima_apertura']}."
                 )
 
             pasos = [
                 paso1,
-                f"2. ORDEN DE COMPRA (PRECIO LÍMITE): Nivel sugerido: {entry}. Ratio Riesgo/Beneficio proyectado: 1 a {opp.ratio_riesgo_beneficio:.1f}.",
-                f"3. PROTECCIÓN DE CAPITAL (STOP LOSS): Ubicar orden defensiva en {stop}. Catalizador de riesgo a monitorear: {opp.catalizador_detonante}.",
-                f"4. OBJETIVO (TAKE PROFIT): Ubicar orden de toma de ganancias en {target}. Soporte secular de fondo: {opp.soporte_secular}.",
+                f"2. NIVEL DE ENTRADA REFERENCIAL (NO ES UNA ORDEN): {entry}. Ratio riesgo/beneficio estimado: 1 a {opp.ratio_riesgo_beneficio:.1f}.",
+                f"3. NIVEL DE INVALIDACIÓN REFERENCIAL (NO ES UNA ORDEN): {stop}. Catalizador de riesgo a monitorear: {opp.catalizador_detonante}.",
+                f"4. OBJETIVO REFERENCIAL (NO ES UNA ORDEN): {target}. Soporte secular de fondo: {opp.soporte_secular}.",
                 f"5. HORIZONTE TEMPORAL: Plazo estimado de maduración de la tesis: {opp.horizonte_temporal}.",
             ]
 
@@ -286,10 +512,10 @@ class ContrarianEvaluator:
             sch = MarketSchedule.check_status(ticker)
 
             pasos = [
-                f"1. ALTO TOTAL: No compres '{ticker}' ({danger.asset_name}) bajo ninguna circunstancia.",
-                "2. NO TE DEJES LLEVAR POR EL FOMO (Miedo a Quedar Fuera): Aunque todos en redes sociales o noticias digan que va a subir sin parar, el precio ya está inflado.",
-                f"3. HORARIO DE REFERENCIA ({sch['estado_texto']}): Este activo cotiza en {sch['horario_argentina']}. Si ya posees posición, evalúa tomar beneficios en horario de mercado activo.",
-                "4. CONSERVA TU LIQUIDEZ: Tu dinero está más seguro en tu cuenta esperando una verdadera caída que arriesgándolo en un techo.",
+                f"1. ALERTA INFORMATIVA: '{ticker}' ({danger.asset_name}) fue clasificado con señales de euforia; esto no es una instrucción de compra o venta.",
+                "2. Contrasta la señal con datos y fuentes independientes; el análisis automatizado puede ser incorrecto.",
+                f"3. HORARIO INFORMATIVO ({sch['estado_texto']}): Este activo cotiza en {sch['horario_argentina']}.",
+                "4. Revisa la información y decide de forma independiente; el monitor no transmite ni ejecuta órdenes.",
             ]
             return GuiaOperador(
                 estado_semaforo="ALERTA DE PELIGRO",
@@ -307,10 +533,9 @@ class ContrarianEvaluator:
         else:
             sch_general = MarketSchedule.check_status("SPY")
             pasos = [
-                "1. QUÉDATE QUIETO: Hoy no toques ningún botón de compra ni de venta.",
-                "2. CONSERVA EL 100% DE TU DINERO EN EFECTIVO: El 95% de las noticias de hoy fueron descartadas como ruido publicitario o chismes sin fundamento.",
-                "3. EVITA EL ERROR N° 1 DEL NOVATO: El error más común es operar todos los días por aburrimiento o impaciencia. Los traders profesionales pasan el 80% de su tiempo observando y esperando.",
-                f"4. ESPERA AL PRÓXIMO ESCANEO: Mantén el radar activo. Horario central de Wall Street: {sch_general['horario_argentina']}.",
+                "1. No se detectaron oportunidades validadas; este análisis no indica comprar, vender ni mantener activos.",
+                "2. Revisa las fuentes originales y considera que la cobertura RSS puede ser incompleta.",
+                f"3. Horario de referencia de Wall Street: {sch_general['horario_argentina']}.",
             ]
             return GuiaOperador(
                 estado_semaforo="ESPERAR / NO OPERAR",
@@ -324,5 +549,3 @@ class ContrarianEvaluator:
                 categoria_mercado=sch_general["categoria"],
                 recomendacion_horaria=sch_general["recomendacion_horaria"],
             )
-
-

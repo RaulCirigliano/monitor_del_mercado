@@ -12,6 +12,26 @@ categories:
       - name: "CNBC Economy"
         url: "https://search.cnbc.com/rs/search/view.html?partnerId=2000&keywords=economy&sort=date&output=rss"
         weight: 0.9
+      - name: "Investing.com Español Mercados"
+        url: "https://es.investing.com/rss/news.rss"
+        weight: 0.9
+
+  argentina_and_latam:
+    name: "Mercado Argentino (BYMA / Merval) y Latinoamérica"
+    feeds:
+      - name: "Ámbito Financiero Finanzas"
+        url: "https://www.ambito.com/rss/pages/finanzas.xml"
+        weight: 1.0
+      - name: "Google News Merval & BYMA (AR)"
+        url: "https://news.google.com/rss/search?q=Merval+OR+BYMA+OR+YPF+OR+Vaca+Muerta+OR+Galicia+OR+Pampa+Energia&hl=es-419&gl=AR&ceid=AR:es-419"
+        weight: 1.0
+
+  global_tech_and_china:
+    name: "Acciones Globales, IA y China Tech"
+    feeds:
+      - name: "Google News Big Tech & AI"
+        url: "https://news.google.com/rss/search?q=Nvidia+OR+Apple+OR+Tesla+OR+Microsoft+OR+Alibaba+OR+China+Tech+ETF&hl=en-US&gl=US&ceid=US:en"
+        weight: 0.9
 
   commodities_and_energy:
     name: "Materias Primas, Metales y Energía"
@@ -32,3 +52,4 @@ categories:
       - name: "Cointelegraph"
         url: "https://cointelegraph.com/rss"
         weight: 0.9
+

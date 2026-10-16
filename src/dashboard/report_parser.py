@@ -3,6 +3,50 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 
+def _parse_cards(section: str, card_type: str) -> List[Dict[str, Any]]:
+    from src.ingestion.market_schedule import MarketSchedule
+
+    parsed_cards = []
+    card_blocks = re.findall(r"### 📌 ([^\n]+)\n([\s\S]*?)(?=### 📌|$)", section)
+    for header, body in card_blocks:
+        if "—" in header:
+            ticker, asset_name = (part.strip() for part in header.split("—", 1))
+        else:
+            ticker = asset_name = header.strip()
+
+        card: Dict[str, Any] = {"ticker": ticker, "asset_name": asset_name, "tipo": card_type}
+        m_sent = re.search(r"\* \*\*Diagnóstico de Sentimiento:\*\* `([^`]+)`", body)
+        card["sentimiento_mercado"] = m_sent.group(1) if m_sent else None
+        m_score = re.search(r"\* \*\*Score de Asimetría:\*\* \*\*(\d+)/10\*\*", body)
+        card["score_asimetria"] = int(m_score.group(1)) if m_score else None
+        m_rb = re.search(r"\* \*\*Ratio Riesgo/Beneficio:\*\* \*\*1 a ([\d\.]+)\*\*", body)
+        card["ratio_riesgo_beneficio"] = float(m_rb.group(1)) if m_rb else None
+        m_horiz = re.search(r"\* \*\*Horizonte Temporal:\*\* `([^`]+)`", body)
+        card["horizonte_temporal"] = m_horiz.group(1) if m_horiz else None
+        m_entry = re.search(r"\* \*\*Nivel de Entrada / Acumulación:\*\* `([^`]+)`", body)
+        card["nivel_entrada_sugerido"] = m_entry.group(1) if m_entry else None
+        m_stop = re.search(r"- \*\*Stop Loss / Invalidación:\*\* `([^`]+)`", body)
+        card["stop_loss_sugerido"] = m_stop.group(1) if m_stop else None
+        m_target = re.search(r"- \*\*Target Proyectado:\*\* `([^`]+)`", body)
+        card["target_proyectado"] = m_target.group(1) if m_target else None
+        m_tesis = re.search(r"#### 💡 Tesis Contrarian \(Psicología de Masas\):\n>\s*([^\n]+)", body)
+        card["tesis_contrarian"] = m_tesis.group(1).strip() if m_tesis else None
+        m_cat = re.search(r"#### ⚡ Catalizador Detonante:\n([^\n]+)", body)
+        card["catalizador_detonante"] = m_cat.group(1).strip() if m_cat else None
+        m_sec = re.search(r"#### 🏛️ Soporte Secular y Viento de Cola:\n([^\n]+)", body)
+        card["soporte_secular"] = m_sec.group(1).strip() if m_sec else None
+
+        schedule = MarketSchedule.check_status(ticker)
+        card["mercado_abierto"] = schedule["mercado_abierto"]
+        card["horario_mercado"] = schedule["horario_argentina"]
+        card["proxima_apertura"] = schedule["proxima_apertura"]
+        card["categoria_mercado"] = schedule["categoria"]
+        card["estado_texto"] = schedule["estado_texto"]
+        card["recomendacion_horaria"] = schedule["recomendacion_horaria"]
+        parsed_cards.append(card)
+    return parsed_cards
+
+
 def parse_markdown_report(report_path: Path) -> Dict[str, Any]:
     """Parsea un archivo Markdown de reporte y extrae los datos estructurados en formato JSON."""
     if not report_path.exists():
@@ -72,71 +116,20 @@ def parse_markdown_report(report_path: Path) -> Dict[str, Any]:
     result["conclusiones_internas"] = [s.strip() for s in steps]
 
 
-    # Extraer tarjetas de oportunidad
-    # Cada tarjeta inicia con ### 📌 TICKER — NOMBRE
-    card_blocks = re.findall(r"### 📌 ([^\n]+)\n([\s\S]*?)(?=### 📌|## ⚠️|## 📜|$)", text)
-    for header, body in card_blocks:
-        card = {}
-        # Parsear header TICKER — NOMBRE
-        if "—" in header:
-            parts = header.split("—", 1)
-            card["ticker"] = parts[0].strip()
-            card["asset_name"] = parts[1].strip()
-        else:
-            card["ticker"] = header.strip()
-            card["asset_name"] = header.strip()
-
-        # Diagnóstico de sentimiento
-        m_sent = re.search(r"\* \*\*Diagnóstico de Sentimiento:\*\* `([^`]+)`", body)
-        card["sentimiento_mercado"] = m_sent.group(1) if m_sent else "Capitulación"
-
-        # Score
-        m_score = re.search(r"\* \*\*Score de Asimetría:\*\* \*\*(\d+)/10\*\*", body)
-        card["score_asimetria"] = int(m_score.group(1)) if m_score else 7
-
-        # Ratio R/B
-        m_rb = re.search(r"\* \*\*Ratio Riesgo/Beneficio:\*\* \*\*1 a ([\d\.]+)\*\*", body)
-        card["ratio_riesgo_beneficio"] = float(m_rb.group(1)) if m_rb else 3.0
-
-        # Horizonte
-        m_horiz = re.search(r"\* \*\*Horizonte Temporal:\*\* `([^`]+)`", body)
-        card["horizonte_temporal"] = m_horiz.group(1) if m_horiz else "3-6 meses"
-
-        # Nivel de entrada
-        m_entry = re.search(r"\* \*\*Nivel de Entrada / Acumulación:\*\* `([^`]+)`", body)
-        card["nivel_entrada_sugerido"] = m_entry.group(1) if m_entry else "Zona de soporte"
-
-        # Stop loss
-        m_stop = re.search(r"- \*\*Stop Loss / Invalidación:\*\* `([^`]+)`", body)
-        card["stop_loss_sugerido"] = m_stop.group(1) if m_stop else None
-
-        # Target
-        m_target = re.search(r"- \*\*Target Proyectado:\*\* `([^`]+)`", body)
-        card["target_proyectado"] = m_target.group(1) if m_target else None
-
-        # Tesis contrarian
-        m_tesis = re.search(r"#### 💡 Tesis Contrarian \(Psicología de Masas\):\n>\s*([^\n]+)", body)
-        card["tesis_contrarian"] = m_tesis.group(1).strip() if m_tesis else "Capitulación detectada."
-
-        # Catalizador
-        m_cat = re.search(r"#### ⚡ Catalizador Detonante:\n([^\n]+)", body)
-        card["catalizador_detonante"] = m_cat.group(1).strip() if m_cat else "Evento de pánico transitorio."
-
-        # Soporte secular
-        m_sec = re.search(r"#### 🏛️ Soporte Secular y Viento de Cola:\n([^\n]+)", body)
-        card["soporte_secular"] = m_sec.group(1).strip() if m_sec else "Soporte fundamental comprobado."
-
-        # Inteligencia de horarios de mercado para el activo
-        from src.ingestion.market_schedule import MarketSchedule
-        card_sch = MarketSchedule.check_status(card["ticker"])
-        card["mercado_abierto"] = card_sch["mercado_abierto"]
-        card["horario_mercado"] = card_sch["horario_argentina"]
-        card["proxima_apertura"] = card_sch["proxima_apertura"]
-        card["categoria_mercado"] = card_sch["categoria"]
-        card["estado_texto"] = card_sch["estado_texto"]
-        card["recomendacion_horaria"] = card_sch["recomendacion_horaria"]
-
-        result["oportunidades"].append(card)
+    opportunity_section = re.search(
+        r"## 🎯 1\..*?\n([\s\S]*?)(?=\n## ⚠️ 2\.|$)", text
+    )
+    danger_section = re.search(
+        r"## ⚠️ 2\..*?\n([\s\S]*?)(?=\n## 🧭 3\.|\n## 📜|$)", text
+    )
+    if opportunity_section:
+        result["oportunidades"] = _parse_cards(
+            opportunity_section.group(1), "Oportunidad Asimétrica"
+        )
+    if danger_section:
+        result["alertas_peligro"] = _parse_cards(
+            danger_section.group(1), "Trampa de Mercado / Peligro"
+        )
 
     from src.ingestion.market_schedule import MarketSchedule
 
@@ -169,7 +162,8 @@ def parse_markdown_report(report_path: Path) -> Dict[str, Any]:
             guia["consejo_psicologico"] = m_psico.group(1).strip()
 
         # Calcular o asignar horario de mercado en vivo
-        ticker_ref = result["oportunidades"][0]["ticker"] if result["oportunidades"] else "SPY"
+        cards = result["oportunidades"] or result["alertas_peligro"]
+        ticker_ref = cards[0]["ticker"] if cards else "SPY"
         sch_info = MarketSchedule.check_status(ticker_ref)
         guia["mercado_abierto"] = sch_info["mercado_abierto"]
         guia["horario_mercado"] = sch_info["horario_argentina"]
@@ -180,54 +174,4 @@ def parse_markdown_report(report_path: Path) -> Dict[str, Any]:
         guia["ticker_referencia"] = ticker_ref
 
         result["guia_operador"] = guia
-    else:
-        # Retrocompatibilidad con reportes anteriores
-        if result["oportunidades"]:
-            opp0 = result["oportunidades"][0]
-            sch0 = MarketSchedule.check_status(opp0.get("ticker", "SPY"))
-            tesis_text = opp0.get("tesis_contrarian") or "Análisis cuantitativo de oportunidad asimétrica."
-            result["guia_operador"] = {
-                "estado_semaforo": "OPERAR CON CAUTELA",
-                "mensaje_principal": (
-                    f"Oportunidad asimétrica detectada en {opp0.get('ticker')}: {tesis_text} "
-                    f"Estado: {sch0['estado_texto']}. {sch0['recomendacion_horaria']}"
-                ),
-                "checklist_pasos": [
-                    f"1. VERIFICA EL HORARIO ({sch0['estado_texto']}): El mercado de {opp0.get('ticker')} opera de {sch0['horario_argentina']}. {sch0['proxima_apertura']}.",
-                    f"2. PRECIO LÍMITE: {opp0.get('nivel_entrada_sugerido') or 'Esperar confirmación de precio'}.",
-                    f"3. STOP LOSS DEFENSIVO: {opp0.get('stop_loss_sugerido') or 'Definir stop técnico en soporte'}.",
-                    f"4. TAKE PROFIT / OBJETIVO: {opp0.get('target_proyectado') or 'Definir toma de ganancias según resistencia'}.",
-                ],
-                "regla_gestion_riesgo": "REGLA DEL 1%: Nunca arriesgues más del 1-2% del capital de tu cuenta en una sola operación.",
-                "consejo_psicologico": "No compres por impulso ni con mercado cerrado. Espera cotizaciones frescas en vivo.",
-                "mercado_abierto": sch0["mercado_abierto"],
-                "horario_mercado": sch0["horario_argentina"],
-                "proxima_apertura": sch0["proxima_apertura"],
-                "categoria_mercado": sch0["categoria"],
-                "estado_texto": sch0["estado_texto"],
-                "recomendacion_horaria": sch0["recomendacion_horaria"],
-                "ticker_referencia": opp0.get("ticker"),
-            }
-        else:
-            sch_spy = MarketSchedule.check_status("SPY")
-            result["guia_operador"] = {
-                "estado_semaforo": "ESPERAR / NO OPERAR",
-                "mensaje_principal": "El 100% de las noticias analizadas son ruido. La decisión más inteligente hoy es no operar.",
-                "checklist_pasos": [
-                    "1. Mantén tu dinero 100% en liquidez.",
-                    "2. No compres activos por aburrimiento o ansiedad.",
-                    f"3. Horario central de Wall Street: {sch_spy['horario_argentina']}.",
-                ],
-                "regla_gestion_riesgo": "No perder dinero en días de ruido es exactamente igual a ganar dinero.",
-                "consejo_psicologico": "Los profesionales pasan la mayor parte del tiempo esperando la asimetría correcta.",
-                "mercado_abierto": sch_spy["mercado_abierto"],
-                "horario_mercado": sch_spy["horario_argentina"],
-                "proxima_apertura": sch_spy["proxima_apertura"],
-                "categoria_mercado": sch_spy["categoria"],
-                "estado_texto": sch_spy["estado_texto"],
-                "recomendacion_horaria": sch_spy["recomendacion_horaria"],
-                "ticker_referencia": "SPY",
-            }
-
     return result
-

@@ -1,6 +1,7 @@
 # Ingesta de datos y mercado
 feedparser>=6.0.11
 yfinance>=0.2.50
+pandas>=1.3.0
 beautifulsoup4>=4.12.3
 
 # Validación y estructuras de datos
@@ -9,7 +10,6 @@ pyyaml>=6.0.2
 
 # Clientes HTTP e Inteligencia Artificial
 httpx>=0.28.0
-google-genai>=1.0.0
 
 # Formato y presentación en terminal
 rich>=13.9.0

@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import re
 from typing import Dict, List, Optional
 import feedparser
@@ -9,23 +10,56 @@ from config import settings
 from src.models import NewsItem
 from src.ingestion.deduplicator import Deduplicator
 
+logger = logging.getLogger(__name__)
+
 
 class RSSCollector:
     """Colector y normalizador de fuentes RSS para ingesta rápida de bajo consumo."""
 
-    # Mapeo de términos de materias primas e índices a tickers de yfinance
+    # Mapeo de términos de materias primas, índices, acciones globales, China/IA y Argentina (BYMA) a tickers de yfinance
     KEYWORD_TICKER_MAP = {
+        # Criptoactivos
         r"\b(bitcoin|btc)\b": "BTC-USD",
         r"\b(ethereum|ether|eth)\b": "ETH-USD",
         r"\b(solana|sol)\b": "SOL-USD",
-        r"\b(crude oil|petróleo|wti|brent|petroleo)\b": "CL=F",
+        # Materias Primas y Energía
+        r"\b(crude oil|petr[oó]leo|wti|brent)\b": "CL=F",
         r"\b(gold|oro)\b": "GC=F",
         r"\b(silver|plata)\b": "SI=F",
         r"\b(natural gas|gas natural)\b": "NG=F",
+        # Bonos e Índices Macro
         r"\b(sp500|s&p 500|s&p500)\b": "^GSPC",
+        r"\b(spdr s&p|spy|s&p 500 etf)\b": "SPY",
         r"\b(nasdaq|qqq)\b": "QQQ",
         r"\b(treasury yields?|bonos del tesoro|tlt|10-year yield)\b": "TLT",
-        r"\b(dxy|dollar index|dólar|dolar)\b": "DX-Y.NYB",
+        r"\b(dxy|dollar index|d[oó]lar)\b": "DX-Y.NYB",
+        # Acciones US / Globales
+        r"\b(nvidia|nvda|blackwell|geforce)\b": "NVDA",
+        r"\b(apple|aapl|iphone|cupertino)\b": "AAPL",
+        r"\b(tesla|tsla|elon musk|cybertruck)\b": "TSLA",
+        r"\b(microsoft|msft|azure|copilot)\b": "MSFT",
+        r"\b(alibaba|baba|jack ma|aliexpress)\b": "BABA",
+        # ETFs China / IA / Robótica
+        r"\b(msci china|mchi)\b": "MCHI",
+        r"\b(china internet|kweb|krane|china tech)\b": "KWEB",
+        r"\b(robotics|botz|artificial intelligence etf|rob[oó]tica)\b": "BOTZ",
+        # Argentina (BYMA / Merval)
+        r"\b(ypf|ypfd|vaca muerta)\b": "YPFD.BA",
+        r"\b(grupo financiero galicia|banco galicia|galicia|ggal)\b": "GGAL.BA",
+        r"\b(pampa energ[ií]a|pamp)\b": "PAMP.BA",
+        r"\b(banco macro|bma)\b": "BMA.BA",
+        r"\b(aluar|alua)\b": "ALUA.BA",
+        r"\b(ternium|txar)\b": "TXAR.BA",
+    }
+
+    BYMA_ALIAS_MAP = {
+        "GGAL": "GGAL.BA",
+        "YPFD": "YPFD.BA",
+        "YPF": "YPFD.BA",
+        "PAMP": "PAMP.BA",
+        "BMA": "BMA.BA",
+        "ALUA": "ALUA.BA",
+        "TXAR": "TXAR.BA",
     }
 
     def __init__(self, deduplicator: Optional[Deduplicator] = None):
@@ -50,18 +84,18 @@ class RSSCollector:
         """Extrae tickers explícitos ($TICKER o TICKER en mayúsculas) y por palabras clave."""
         found = set()
 
-        # 1. Tickers con signo de dólar: $AAPL, $TSLA, etc.
-        dollar_tickers = re.findall(r"\$([A-Z]{1,6})\b", text)
+        # 1. Tickers con signo de dólar: $AAPL, $TSLA, $GGAL.BA, etc.
+        dollar_tickers = re.findall(r"\$([A-Z]{1,6}(?:\.BA)?)\b", text)
         for t in dollar_tickers:
-            found.add(t)
+            found.add(self.BYMA_ALIAS_MAP.get(t, t))
 
-        # 2. Tickers entre paréntesis: (NYSE: BABA), (NASDAQ: MSFT), (NVDA)
-        paren_tickers = re.findall(r"\((?:[A-Z]+:\s*)?([A-Z]{2,5})\)", text)
+        # 2. Tickers entre paréntesis: (NYSE: BABA), (NASDAQ: MSFT), (BYMA: GGAL), (NVDA)
+        paren_tickers = re.findall(r"\((?:[A-Z]+:\s*)?([A-Z]{2,6}(?:\.BA)?)\)", text)
         for t in paren_tickers:
-            if t not in {"CEO", "CFO", "IPO", "FED", "SEC", "ETF", "GDP", "CPI", "USA", "USD"}:
-                found.add(t)
+            if t not in {"CEO", "CFO", "IPO", "FED", "SEC", "ETF", "GDP", "CPI", "USA", "USD", "BYMA", "BCRA"}:
+                found.add(self.BYMA_ALIAS_MAP.get(t, t))
 
-        # 3. Mapeo semántico de commodities y macro
+        # 3. Mapeo semántico bilingüe de commodities, macro, tech y acciones argentinas
         lower_text = text.lower()
         for pattern, symbol in self.KEYWORD_TICKER_MAP.items():
             if re.search(pattern, lower_text):
@@ -76,25 +110,46 @@ class RSSCollector:
             with httpx.Client(headers=self.client_headers, timeout=15.0, follow_redirects=True) as client:
                 response = client.get(url)
                 if response.status_code != 200:
+                    logger.warning(
+                        "El feed %s respondió con HTTP %s",
+                        source_name,
+                        response.status_code,
+                    )
                     return items
                 content = response.text
-        except Exception:
-            # Fallback directo a feedparser si httpx encuentra un bloqueo de transporte
-            try:
-                feed = feedparser.parse(url)
-            except Exception:
-                return items
-        else:
+        except Exception as exc:
+            logger.warning(
+                "No se pudo descargar el feed %s (%s).",
+                source_name,
+                type(exc).__name__,
+            )
+            return items
+
+        try:
             feed = feedparser.parse(content)
+        except Exception as exc:
+            logger.warning(
+                "No se pudo interpretar el feed %s (%s).",
+                source_name,
+                type(exc).__name__,
+            )
+            return items
+
+        if getattr(feed, "bozo", False):
+            logger.warning("El feed %s contiene XML mal formado.", source_name)
 
         if not hasattr(feed, "entries") or not feed.entries:
             return items
 
         for entry in feed.entries[: settings.max_items_per_feed]:
-            title = self._clean_html(getattr(entry, "title", ""))
-            link = getattr(entry, "link", "").strip()
-            summary = self._clean_html(getattr(entry, "summary", getattr(entry, "description", "")))
-            published = getattr(entry, "published", getattr(entry, "updated", None))
+            title_raw = getattr(entry, "title", "")
+            link_raw = getattr(entry, "link", "")
+            summary_raw = getattr(entry, "summary", getattr(entry, "description", ""))
+            published_raw = getattr(entry, "published", getattr(entry, "updated", None))
+            title = self._clean_html(title_raw if isinstance(title_raw, str) else "")
+            link = link_raw.strip() if isinstance(link_raw, str) else ""
+            summary = self._clean_html(summary_raw if isinstance(summary_raw, str) else "")
+            published = published_raw if isinstance(published_raw, str) else None
 
             if not title or len(title) < 10:
                 continue
@@ -114,8 +169,8 @@ class RSSCollector:
             combined_text = f"{title}. {summary}"
             tickers = self._extract_tickers(combined_text)
 
-            items.append(
-                NewsItem(
+            try:
+                items.append(NewsItem(
                     id=item_id,
                     title=title,
                     link=link,
@@ -124,21 +179,37 @@ class RSSCollector:
                     published=published,
                     summary=summary,
                     tickers_detected=tickers,
+                ))
+            except (TypeError, ValueError) as exc:
+                logger.warning(
+                    "Se omitió una entrada inválida del feed %s (%s).",
+                    source_name,
+                    type(exc).__name__,
                 )
-            )
 
         return items
 
     @staticmethod
     def _extract_search_keywords(user_text: str) -> str:
-        """Extrae palabras clave de búsqueda quitando frases de relleno comunes en español."""
+        """Extrae palabras clave de búsqueda quitando frases de relleno comunes en español e inglés."""
         cleaned = re.sub(
             r"^(sigue|buscar?|monitorear?|revisar?|rastrear?|analizar?|ver|atento a)\s+(las\s+noticias\s+(sobre|de|del)?|noticias\s+(sobre|de|del)?|informaci[oó]n\s+(sobre|de|del)?|a)?\s*",
             "",
             user_text,
             flags=re.IGNORECASE,
         )
-        cleaned = re.sub(r"\b(que\s+dio|que\s+dijo|seg[uú]n)\b", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(
+            r"^(follow|search(?:\s+for)?|monitor|track|check|analyze|watch|look\s+for)\s+(the\s+latest\s+news\s+(?:about|on|for)|latest\s+news\s+(?:about|on|for)|the\s+news\s+(?:about|on|for)|news\s+(?:about|on|for)|information\s+(?:about|on))?\s*",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+        cleaned = re.sub(
+            r"\b(que\s+dio|que\s+dijo|seg[uú]n|according\s+to|what\s+did\s+say)\b",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
         cleaned = " ".join(cleaned.split()).strip()
         return cleaned if cleaned else user_text
 
@@ -204,4 +275,3 @@ class RSSCollector:
                 all_news.extend(fetched)
 
         return all_news
-

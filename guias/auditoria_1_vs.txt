@@ -1,0 +1,371 @@
+Voy a revisar la estructura, los puntos de integración y la lógica principal; luego ejecutaré las comprobaciones disponibles y priorizaré los hallazgos con evidencia concreta.
+
+Ran terminal command: git status --short && printf '\n--- files ---\n' && git ls-files | sed -n '1,200p'
+
+Find files matching `**/{package.json,pyproject.toml,requirements.txt,go.mod,Cargo.toml,pom.xml,bu...`
+
+Search for `TODO|FIXME|XXX|HACK`
+
+Read 
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/README.md"
+}
+
+Read 
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/main.py"
+}
+
+Read 
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/pipeline.py"
+}
+
+Read 
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/config/settings.py"
+}
+
+Read 
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/config/feeds.yaml"
+}
+
+Read 
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/requirements.txt"
+}
+
+Read 
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/pytest.ini"
+}
+
+La arquitectura y los comandos de ejecución ya están identificados. Ahora estoy contrastando contratos de datos y comportamiento entre ingesta, proveedores de IA, reportes y dashboard, donde suelen aparecer los fallos de integración.
+
+Read 
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/ingestion/rss_collector.py"
+}
+
+Read 
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/ingestion/market_data.py"
+}
+
+Read 
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/ingestion/deduplicator.py"
+}
+
+Read 
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/ingestion/market_schedule.py"
+}
+
+Read 
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/models/opportunity.py"
+}
+
+Read 
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/models/asset_info.py"
+}
+
+Read 
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/models/raw_feed.py"
+}
+
+Read 
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/tests/test_components.py"
+}
+
+Read , lines 1 to 240
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/ingestion/rss_collector.py",
+  "view_range": [
+    1,
+    240
+  ]
+}
+
+Read , lines 1 to 260
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/tests/test_components.py",
+  "view_range": [
+    1,
+    260
+  ]
+}
+
+Read , lines 1 to 260
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/intelligence/contrarian_evaluator.py",
+  "view_range": [
+    1,
+    260
+  ]
+}
+
+Read 
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/intelligence/ollama_client.py"
+}
+
+Read 
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/intelligence/gemini_client.py"
+}
+
+Read , lines 1 to 220
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/intelligence/prompts.py",
+  "view_range": [
+    1,
+    220
+  ]
+}
+
+Read , lines 1 to 280
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/dashboard/server.py",
+  "view_range": [
+    1,
+    280
+  ]
+}
+
+Read , lines 1 to 240
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/dashboard/report_parser.py",
+  "view_range": [
+    1,
+    240
+  ]
+}
+
+Read , lines 180 to 380
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/intelligence/contrarian_evaluator.py",
+  "view_range": [
+    180,
+    380
+  ]
+}
+
+Read , lines 190 to 240
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/ingestion/rss_collector.py",
+  "view_range": [
+    190,
+    240
+  ]
+}
+
+Read , lines 190 to 270
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/tests/test_components.py",
+  "view_range": [
+    190,
+    270
+  ]
+}
+
+Read , lines 180 to 340
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/dashboard/server.py",
+  "view_range": [
+    180,
+    340
+  ]
+}
+
+Read , lines 180 to 260
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/dashboard/report_parser.py",
+  "view_range": [
+    180,
+    260
+  ]
+}
+
+Read , lines 1 to 300
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/reporting/markdown_generator.py",
+  "view_range": [
+    1,
+    300
+  ]
+}
+
+Read , lines 1 to 280
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/web/app.js",
+  "view_range": [
+    1,
+    280
+  ]
+}
+
+Read 
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/launch.sh"
+}
+
+Search for `inject_to_trading_bot|deleteReport|api/reports|api/scan|category|directive|cu...`
+
+Ran terminal command: python -m pytest -q
+Tool execution failed with exit code 127
+
+Search for `STEP2_DANGER|candidato_peligro|alertas_peligro|valid_dangers|candidate_danger`
+
+Search for `http://0\.0\.0\.0|Access-Control-Allow-Origin|target_file = \(settings\.repor...`
+
+Read , lines 200 to 310
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/web/app.js",
+  "view_range": [
+    200,
+    310
+  ]
+}
+
+Read , lines 610 to 690
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/web/app.js",
+  "view_range": [
+    610,
+    690
+  ]
+}
+
+Read , lines 850 to 985
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/web/app.js",
+  "view_range": [
+    850,
+    985
+  ]
+}
+
+Read , lines 1 to 120
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/dashboard/server.py",
+  "view_range": [
+    1,
+    120
+  ]
+}
+
+Read , lines 220 to 300
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/dashboard/server.py",
+  "view_range": [
+    220,
+    300
+  ]
+}
+
+Ran terminal command: python3 -m pytest -q
+Tool execution failed with exit code 1
+
+Search for `function renderReport|innerHTML|escapeHtml|innerText|textContent`
+
+Ya aparecen varios fallos funcionales verificables: las alertas de peligro no se generan, el dashboard puede reutilizar un reporte anterior tras un escaneo fallido y el servidor publica operaciones sensibles sin control de acceso. Voy a cerrar la revisión verificando el alcance y las pruebas disponibles.
+
+Ran terminal command: if [ -x .venv/bin/python ]; then .venv/bin/python -m pytest -q; else printf 'No existe .venv/bin/python\n'; fi
+
+Ran terminal command: python3 -m compileall -q config src main.py && echo 'compileall: OK'
+
+Read , lines 281 to 435
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/web/app.js",
+  "view_range": [
+    281,
+    435
+  ]
+}
+
+Read , lines 35 to 140
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/intelligence/contrarian_evaluator.py",
+  "view_range": [
+    35,
+    140
+  ]
+}
+
+Read , lines 165 to 225
+Completed with input: {
+  "path": "/home/raul/Escritorio/proyectos/monitor del mercado/src/intelligence/contrarian_evaluator.py",
+  "view_range": [
+    165,
+    225
+  ]
+}
+
+Search for `detected_tickers|list\(detected_tickers\)|for t in`
+
+Search for `def _calculate_rsi|change_pct|prev_price|history\(period|except Exception|ret...`
+
+Ran terminal command: nl -ba src/dashboard/server.py | sed -n '18,28p;92,110p;185,222p;230,262p;280,292p'
+
+Ran terminal command: nl -ba web/app.js | sed -n '638,684p;875,980p'
+
+Ran terminal command: nl -ba src/intelligence/contrarian_evaluator.py | sed -n '170,222p'; nl -ba src/pipeline.py | sed -n '54,71p'
+
+Ran terminal command: nl -ba src/ingestion/market_data.py | sed -n '14,38p;47,103p'; nl -ba src/ingestion/market_schedule.py | sed -n '1,5p;74,125p'
+
+Ran terminal command: nl -ba main.py | sed -n '18,47p'; git status --short
+
+Ran terminal command: nl -ba README.md | sed -n '1,16p'; nl -ba src/models/opportunity.py | sed -n '25,46p'; nl -ba src/intelligence/prompts.py | sed -n '15,42p'; nl -ba src/intelligence/contrarian_evaluator.py | sed -n '45,58p'; nl -ba src/ingestion/market_schedule.py | sed -n '1,4p;74,86p'; nl -ba src/ingestion/market_data.py | sed -n '14,36p;59,63p'
+
+## Errores encontrados — ordenados por gravedad
+
+### Grave
+
+| # | Hallazgo | Evidencia e impacto |
+|---|---|---|
+| 1 | **El dashboard queda expuesto a la red sin autenticación.** | El servidor escucha en todas las interfaces (`server.py:286`), permite cualquier origen web (`server.py:23`) y ofrece endpoints para escanear e inyectar datos al bot (`server.py:191`). Un equipo que pueda alcanzar el puerto puede invocarlos sin pasar por la interfaz ni confirmar una inyección. |
+| 2 | **La eliminación de reportes permite salir del directorio autorizado.** | La ruta se resuelve con datos del usuario, pero no se comprueba que siga dentro de `reportes/` (`server.py:237`); después se elimina el archivo resuelto (`server.py:254`). Combinado con la exposición anterior, puede borrar archivos accesibles para el usuario del proceso, no solo reportes. |
+| 3 | **Un escaneo fallido puede reenviar al bot un análisis anterior como si fuera nuevo.** | El frontend no verifica `res.ok` ni usa el resultado del escaneo: vuelve a cargar el último reporte e intenta auto-inyectarlo (`app.js:651`, `app.js:659`, `app.js:665`). Un error HTTP puede terminar en un mensaje de éxito y en el envío de una tesis desactualizada. |
+
+### Medio
+
+| # | Hallazgo | Evidencia e impacto |
+|---|---|---|
+| 4 | **Las alertas de peligro están implementadas en el esquema y los prompts, pero no en el flujo de evaluación.** | Se inicializa `valid_dangers` vacío y el ciclo solo procesa `candidato_oportunidad`; nunca consume `candidato_peligro` ni crea fichas de peligro (`contrarian_evaluator.py:174`, `contrarian_evaluator.py:189`). El sistema reportará cero trampas de mercado aunque el modelo las detecte. |
+| 5 | **El ratio riesgo/beneficio no se calcula ni se valida contra entrada, stop y objetivo.** | La ficha acepta un `ratio_riesgo_beneficio` numérico junto a precios en texto libre (`opportunity.py:29`); la evaluación solo compara ese número declarado con el mínimo (`contrarian_evaluator.py:198`). Por tanto, una ficha con niveles incompatibles puede presentarse como oportunidad 1:3. |
+| 6 | **La auto-inyección etiqueta como “Oportunidad” los reportes sin oportunidades.** | En la rama sin oportunidades se asignan `type = "Oportunidad"` y confianza 80, incluso si el texto dice “ESPERAR / NO OPERAR” (`app.js:941`). El bot recibe un tipo que contradice la instrucción. |
+| 7 | **Los horarios de Wall Street son incorrectos durante parte del año y en feriados.** | La apertura/cierre de acciones globales está fijada a 10:30–17:00 ARG (`market_schedule.py:79`); no se ajusta al horario de verano de EE. UU. ni consulta feriados. Puede mostrar el mercado abierto o cerrado en el momento equivocado. |
+| 8 | **La selección de cotizaciones pierde determinismo y puede excluir activos importantes.** | Los tickers se guardan en un `set` y luego se consultan los primeros 15 de su conversión a lista (`pipeline.py:57`, `pipeline.py:65`). El orden varía y puede dejar afuera benchmarks o activos mencionados en noticias. |
+
+### Leve
+
+| # | Hallazgo | Evidencia e impacto |
+|---|---|---|
+| 9 | **Las métricas técnicas no coinciden del todo con lo que anuncian.** | `change_pct_24h` compara los dos últimos cierres diarios, no necesariamente una ventana móvil de 24 horas (`market_data.py:59`); y el RSI usa medias móviles simples aunque el código lo describe como método de Wilder (`market_data.py:14`, `market_data.py:23`). |
+| 10 | **La cifra de “ruido descartado” no representa descartes reales por noticia.** | Se calcula como total de noticias menos cantidad de fichas generadas (`contrarian_evaluator.py:207`); por eso incluye noticias no clasificadas como ruido y puede inflar el porcentaje del reporte. |
+| 11 | **La documentación contradice la integración disponible.** | El README afirma que el sistema no se vincula a plataformas de trading (`README.md:6`), pero el dashboard reenvía directivas a un bot de trading (`server.py:199`). No ejecuta órdenes directamente, pero sí existe esa integración y debería describirse. |
+
+**Verificación:** las 7 pruebas disponibles pasan con el entorno virtual y `compileall` no detecta errores de sintaxis. Las pruebas actuales no cubren los problemas graves ni varios de los defectos de lógica descritos. No modifiqué archivos.
+
+resultados
+
+Reparaciones realizadas
+Graves
+
+Dashboard limitado a 127.0.0.1; eliminé CORS abierto y rechacé solicitudes de otros orígenes. Protegí la lectura y eliminación de reportes contra rutas fuera de reportes/, y la entrega de archivos estáticos contra traversal en server.py.
+El frontend ahora detecta errores HTTP del escaneo y ya no autoenvía el reporte anterior. Tampoco envía instrucciones al bot si el ciclo no produjo una oportunidad o alerta válida; los casos de peligro se etiquetan correctamente en app.js.
+Los escaneos sin noticias ahora guardan un reporte nuevo en pipeline.py.
+Medios
+
+Implementé la generación de alertas de peligro de principio a fin: evaluación, lectura de reportes y envío desde el dashboard, en contrarian_evaluator.py, report_parser.py y app.js.
+El ratio riesgo/beneficio de cada oportunidad se recalcula con entrada, stop y objetivo; se descartan niveles inconsistentes o sin precios numéricos.
+Corregí horarios de Wall Street para el cambio estacional de EE. UU. y cierres recurrentes; la selección de tickers ahora es determinista y prioriza los detectados en noticias, en market_schedule.py y pipeline.py.
+Las métricas usan el último precio disponible y RSI de Wilder; el contador de ruido ya no se deduce de la cantidad de fichas generadas, en market_data.py y asset_info.py.
+--check-env devuelve estado de error si faltan servicios o feeds. Actualicé la documentación de integración y ubicación de reportes en main.py y README.md.
+Verificación: 16 pruebas pasan; compileall, node --check y git diff --check también pasan. Las pruebas no verifican conexiones reales con Ollama, yfinance ni el bot de trading. No hice commit.

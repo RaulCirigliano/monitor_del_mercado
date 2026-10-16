@@ -50,8 +50,9 @@ class MarkdownReportGenerator:
         """Escribe el reporte completo en carpetas por fecha y retorna la ruta del archivo generado."""
         import re
 
-        date_str = datetime.now().strftime("%Y-%m-%d")
-        time_str = datetime.now().strftime("%H%M%S")
+        generated_at = datetime.now()
+        date_str = generated_at.strftime("%Y-%m-%d")
+        time_str = generated_at.strftime("%H%M%S%f")
 
         # 1. Crear subcarpeta por fecha: reportes/YYYY-MM-DD/
         date_folder = self.output_dir / date_str
@@ -70,6 +71,10 @@ class MarkdownReportGenerator:
             modo_label = "🛰️ RADAR AUTÓNOMO"
 
         report_path = date_folder / filename
+        suffix = 2
+        while report_path.exists():
+            report_path = date_folder / f"{Path(filename).stem}_{suffix}{Path(filename).suffix}"
+            suffix += 1
 
         pct_noise = (
             (batch.total_ruido_descartado / batch.total_noticias_analizadas * 100.0)

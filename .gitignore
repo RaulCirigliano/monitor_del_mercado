@@ -20,6 +20,7 @@ htmlcov/
 # IDEs & System
 .vscode/
 .idea/
+.continue/
 .DS_Store
 Thumbs.db
 *.log

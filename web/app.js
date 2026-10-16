@@ -5,10 +5,15 @@ async function fetchStatus() {
     const res = await fetch('/api/status');
     const data = await res.json();
     const statusDiv = document.getElementById('ollama-status');
-    if (data.ollama_online) {
+    if (data.ollama_online && data.ollama_model_available) {
       statusDiv.innerHTML = `
         <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
         <span class="text-slate-300">Ollama: <strong class="text-emerald-400">${data.ollama_model}</strong></span>
+      `;
+    } else if (data.ollama_online) {
+      statusDiv.innerHTML = `
+        <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+        <span class="text-slate-300">Modelo no instalado: <strong class="text-amber-400">${escapeHtml(data.ollama_model)}</strong></span>
       `;
     } else {
       statusDiv.innerHTML = `
@@ -35,11 +40,11 @@ function filterReportsTab(tab) {
   const btnTod = document.getElementById('filter-todos-btn');
 
   if (tab === 'vigentes') {
-    btnVig.className = 'px-2.5 py-1 rounded bg-cyan-950 text-cyan-300 border border-cyan-500 font-bold transition-all cursor-pointer';
-    btnTod.className = 'px-2.5 py-1 rounded bg-slate-900 text-slate-400 border border-slate-800 transition-all cursor-pointer';
+    btnVig.classList.add('is-active');
+    btnTod.classList.remove('is-active');
   } else {
-    btnTod.className = 'px-2.5 py-1 rounded bg-cyan-950 text-cyan-300 border border-cyan-500 font-bold transition-all cursor-pointer';
-    btnVig.className = 'px-2.5 py-1 rounded bg-slate-900 text-slate-400 border border-slate-800 transition-all cursor-pointer';
+    btnTod.classList.add('is-active');
+    btnVig.classList.remove('is-active');
   }
 
   renderReportsListButtons();
@@ -79,8 +84,8 @@ function renderReportsListButtons() {
     const ageLabel = r.horas_antiguedad !== undefined ? ` (${r.horas_antiguedad}h)` : '';
 
     const baseClass = isSelected
-      ? 'px-3 py-1.5 rounded-lg bg-cyan-950 text-cyan-300 border border-cyan-500 font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs shadow-[0_0_10px_rgba(6,182,212,0.3)]'
-      : 'px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/60 transition-colors cursor-pointer flex items-center gap-1.5 text-xs';
+      ? 'active-report'
+      : '';
 
     btn.className = baseClass;
     btn.innerHTML = `${isVigenteDot} <span>${modeIcon} ${escapeHtml(folderLabel + r.name)}${ageLabel}</span>`;
@@ -198,11 +203,9 @@ function highlightActiveButton(targetPath) {
   if (!targetPath) return;
   document.querySelectorAll('#reports-list button').forEach(b => {
     const btnPath = b.getAttribute('data-path');
-    if (btnPath && (btnPath === targetPath || btnPath.endsWith(targetPath) || targetPath.endsWith(btnPath))) {
-      b.className = 'px-3 py-1.5 rounded-lg bg-cyan-950 text-cyan-300 border border-cyan-500 font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs shadow-[0_0_10px_rgba(6,182,212,0.3)]';
-    } else {
-      b.className = 'px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/60 transition-colors cursor-pointer flex items-center gap-1.5 text-xs';
-    }
+    b.classList.toggle('active-report', Boolean(btnPath && (
+      btnPath === targetPath || btnPath.endsWith(targetPath) || targetPath.endsWith(btnPath)
+    )));
   });
 }
 
@@ -319,8 +322,8 @@ function renderReport(report) {
   if (opportunities.length === 0) {
     oppContainer.innerHTML = `
       <div class="col-span-full p-6 rounded-xl border border-dashed border-slate-800 text-center text-slate-400 text-xs font-mono">
-        No se detectaron capitulaciones con ratio R/B ≥ 1:3 en este ciclo.<br>
-        <span class="text-emerald-400">Disciplina de capital activa: 100% clasificado como ruido sin asimetría.</span>
+        No se detectaron oportunidades validadas en este reporte.<br>
+        <span class="text-slate-500">Esto no implica que todas las noticias sean ruido ni que el análisis esté completo.</span>
       </div>
     `;
   } else {
@@ -342,13 +345,13 @@ function renderReport(report) {
       </div>
     `;
   } else {
-    dangers.forEach(card => {
-      dangerContainer.appendChild(createDangerCard(card));
+    dangers.forEach((card, idx) => {
+      dangerContainer.appendChild(createDangerCard(card, idx));
     });
   }
 
   // 4. Hoja de Ruta del Operador Novato
-  const guia = report.guia_operador || synthesizeGuideForNovice(report);
+  const guia = report.guia_operador;
   const semBadge = document.getElementById('operator-semaphore-badge');
   const semText = document.getElementById('operator-semaphore-text');
   const mainMsg = document.getElementById('operator-main-message');
@@ -368,16 +371,16 @@ function renderReport(report) {
     if (semText) semText.innerText = guia.estado_semaforo;
     if (semBadge) {
       if (guia.estado_semaforo.includes('OPERAR CON')) {
-        semBadge.className = 'text-xs px-3 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 font-mono font-bold flex items-center gap-1.5';
+        semBadge.className = 'semaphore-badge is-open';
       } else if (guia.estado_semaforo.includes('PELIGRO')) {
-        semBadge.className = 'text-xs px-3 py-1 rounded-full bg-red-950 text-red-300 border border-red-800 font-mono font-bold flex items-center gap-1.5';
+        semBadge.className = 'semaphore-badge is-danger';
       }
     }
     let fullInstruction = guia.mensaje_principal || '';
     if (guia.mercado_abierto === false && !fullInstruction.includes('CERRADO') && !fullInstruction.includes('ATENCIÓN HORARIO')) {
-      fullInstruction += ` ⚠️ ATENCIÓN HORARIO (MERCADO CERRADO): El mercado físico de ${guia.ticker_referencia || 'este activo'} opera de ${guia.horario_mercado || 'Wall Street 10:30 a 17:00 ARG'} y está CERRADO ahora. No dispares órdenes a tu bot con cotizaciones congeladas para evitar el error de 'datos obsoletos' y el riesgo de Gap de apertura. Ejecuta a partir de la apertura: ${guia.proxima_apertura}.`;
+      fullInstruction += ` El mercado figura cerrado (${guia.horario_mercado || 'horario no disponible'}); el monitor no transmite ni ejecuta órdenes.`;
     } else if (guia.mercado_abierto === true && !fullInstruction.includes('ABIERTO') && !fullInstruction.includes('EN VIVO')) {
-      fullInstruction += ` 🟢 MERCADO EN VIVO: El mercado está ABIERTO (${guia.horario_mercado || 'Horario oficial'}). El bot dispone de cotizaciones frescas y liquidez real para operar.`;
+      fullInstruction += ` El mercado figura en horario de sesión (${guia.horario_mercado || 'horario oficial'}); el monitor no transmite ni ejecuta órdenes.`;
     }
     if (mainMsg) mainMsg.innerText = fullInstruction;
 
@@ -390,9 +393,7 @@ function renderReport(report) {
       mktDot.className = isMktOpen ? 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse' : 'w-2 h-2 rounded-full bg-red-400';
     }
     if (mktBadge) {
-      mktBadge.className = isMktOpen
-        ? 'px-2.5 py-1 rounded text-xs font-mono font-bold flex items-center gap-1.5 bg-emerald-950 text-emerald-300 border border-emerald-700'
-        : 'px-2.5 py-1 rounded text-xs font-mono font-bold flex items-center gap-1.5 bg-red-950 text-red-300 border border-red-800';
+      mktBadge.className = isMktOpen ? 'market-badge is-open' : 'market-badge is-danger';
     }
     if (schedHours) {
       schedHours.innerText = `${guia.categoria_mercado ? guia.categoria_mercado + ' • ' : ''}${guia.horario_mercado || 'Lunes a Viernes de 10:30 AM a 17:00 PM ARG'}`;
@@ -404,8 +405,8 @@ function renderReport(report) {
     if (botWarningText) {
       botWarningText.innerText = guia.recomendacion_horaria || (
         isMktOpen
-          ? 'El mercado físico está recibiendo velas en vivo. Tu bot de trading puede operar con cotizaciones frescas.'
-          : 'El mercado físico está cerrado ahora. No dispares órdenes a tu bot con datos congelados (antigüedad > 2700s) para evitar rechazos o gaps.'
+          ? 'El horario de mercado se muestra solo como contexto; el monitor no transmite ni ejecuta órdenes.'
+          : 'El mercado figura cerrado. El monitor no transmite ni ejecuta órdenes.'
       );
     }
 
@@ -422,6 +423,22 @@ function renderReport(report) {
     }
     if (riskRule) riskRule.innerText = guia.regla_gestion_riesgo;
     if (psychoAdv) psychoAdv.innerText = guia.consejo_psicologico;
+  } else {
+    if (semText) semText.innerText = 'No incluida en el reporte';
+    if (semBadge) semBadge.className = 'semaphore-badge';
+    if (mainMsg) mainMsg.innerText = 'Este reporte no contiene una guía operativa; no se generaron instrucciones automáticamente.';
+    if (checkList) checkList.innerHTML = '';
+    if (riskRule) riskRule.innerText = '';
+    if (psychoAdv) psychoAdv.innerText = '';
+    if (mktStatusText) mktStatusText.innerText = 'Estado no incluido';
+    if (mktDot) mktDot.className = 'w-2 h-2 rounded-full bg-slate-600';
+    if (mktBadge) mktBadge.className = 'market-badge';
+    if (schedHours) schedHours.innerText = 'No disponible en este reporte';
+    if (nextOpen) {
+      nextOpen.innerText = 'No disponible';
+      nextOpen.className = 'text-slate-400';
+    }
+    if (botWarningText) botWarningText.innerText = 'El monitor es informativo y no transmite ni ejecuta órdenes.';
   }
 }
 
@@ -457,171 +474,84 @@ function copyMacroInstruction() {
   });
 }
 
-function synthesizeGuideForNovice(report) {
-  const opps = report.oportunidades || [];
-  const dangers = report.alertas_peligro || [];
-
-  if (opps.length > 0) {
-    const opp0 = opps[0];
-    const tesis = opp0.tesis_contrarian || 'Análisis cuantitativo de asimetría favorable.';
-    return {
-      estado_semaforo: "OPERAR CON CAUTELA",
-      mensaje_principal: `Oportunidad asimétrica en ${opp0.ticker}: ${tesis}`,
-      checklist_pasos: [
-        `1. LOCALIZA EL ACTIVO: Abre tu plataforma de inversión y busca '${opp0.ticker}' (${opp0.asset_name || ''}).`,
-        `2. ORDEN DE COMPRA (LÍMITE): Nivel sugerido: ${opp0.nivel_entrada_sugerido || 'Precio actual de mercado'}.`,
-        `3. STOP LOSS DEFENSIVO: Nivel sugerido: ${opp0.stop_loss_sugerido || 'Definir stop loss técnico en zona de soporte'}.`,
-        `4. TOMA DE GANANCIAS (TAKE PROFIT): Objetivo proyectado: ${opp0.target_proyectado || 'Definir toma de ganancias según resistencia'}.`,
-        `5. HORIZONTE TEMPORAL: Plazo estimado: ${opp0.horizonte_temporal || 'Medio plazo'}.`
-      ],
-      regla_gestion_riesgo: "REGLA DEL 1%: Nunca arriesgues más del 1% o 2% del total de tu cuenta en esta operación.",
-      consejo_psicologico: "Opera con disciplina matemática y respeta tus niveles de stop loss sin apego emocional."
-    };
-  } else if (dangers.length > 0) {
-    const danger0 = dangers[0];
-    return {
-      estado_semaforo: "ALERTA DE PELIGRO",
-      mensaje_principal: `El activo ${danger0.ticker} está en zona de sobrecalentamiento y euforia mediática peligrosa. Abstente de comprar.`,
-      checklist_pasos: [
-        `1. ALTO TOTAL: No compres '${danger0.ticker}' bajo ninguna circunstancia.`,
-        "2. NO TE DEJES LLEVAR POR EL FOMO: Aunque en redes digan que subirá al infinito, el precio ya está inflado.",
-        "3. SI YA TIENES ESTE ACTIVO: Considera asegurar beneficios o colocar un Stop Loss ceñido.",
-        "4. CONSERVA TU LIQUIDEZ: Tu dinero está más seguro en efectivo esperando una verdadera oportunidad."
-      ],
-      regla_gestion_riesgo: "PRESERVACIÓN DE CAPITAL: El primer objetivo de un operador novato no es hacerse rico rápido, sino evitar perder el dinero en las trampas de euforia.",
-      consejo_psicologico: "Sentirás ganas de comprar porque 'todo el mundo habla de ello'. Esa es la trampa psicológica más antigua del mercado. Recuerda: compra en el pánico, huye de la euforia."
-    };
-  } else {
-    return {
-      estado_semaforo: "ESPERAR / NO OPERAR",
-      mensaje_principal: "El mercado no ofrece ninguna oportunidad asimétrica clara hoy. Todo el flujo analizado es ruido mediático transitorio. La decisión más inteligente y rentable hoy es NO OPERAR.",
-      checklist_pasos: [
-        "1. QUÉDATE QUIETO: Hoy no toques ningún botón de compra ni de venta.",
-        "2. CONSERVA EL 100% DE TU DINERO EN EFECTIVO: El 95% de las noticias de hoy fueron descartadas como ruido publicitario o chismes sin fundamento.",
-        "3. EVITA EL ERROR N° 1 DEL NOVATO: El error más común es operar todos los días por aburrimiento o impaciencia. Los traders profesionales pasan el 80% de su tiempo observando y esperando.",
-        "4. ESPERA AL PRÓXIMO ESCANEO: Mantén el radar activo y espera a que el mercado ofrezca una verdadera capitulación con ventaja matemática."
-      ],
-      regla_gestion_riesgo: "PACIENCIA Y DISCIPLINA: No perder dinero en días de ruido es exactamente igual a ganar dinero. El efectivo es una posición ganadora.",
-      consejo_psicologico: "No sientas que estás perdiendo el tiempo por no hacer una operación hoy. La disciplina de esperar a que el precio y el pánico jueguen a tu favor es lo que separa a los perdedores de los inversores exitosos."
-    };
-  }
+function renderCardQuantMetrics(card) {
+  const metrics = [
+    ['RSI(14)', card.rsi_14, ''],
+    ['Z-Score(20)', card.z_score_20, ''],
+    ['% vs 52w High', card.pct_from_52w_high, '%'],
+    ['EMA200', card.ema_200, ''],
+    ['ATR%', card.atr_pct, '%'],
+    ['RVOL', card.rvol_20, 'x']
+  ];
+  return metrics
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([label, value, suffix]) => `<span class="quant-pill"><strong>${label}</strong> ${escapeHtml(value)}${suffix}</span>`)
+    .join('');
 }
 
-
-
 function createOpportunityCard(card, oppIndex = 0) {
-  const div = document.createElement('div');
-  div.className = 'glass-card rounded-xl p-5 border-emerald-500/30 flex flex-col justify-between space-y-4 hover:border-emerald-500/60 transition-all';
-  
+  const div = document.createElement('article');
+  div.className = 'trade-ticket';
+  const metrics = renderCardQuantMetrics(card);
+  const ratio = card.ratio_riesgo_beneficio == null
+    ? 'R/B N/D'
+    : `R/B 1:${escapeHtml(card.ratio_riesgo_beneficio)}`;
+  const score = card.score_asimetria == null ? 'N/D' : escapeHtml(card.score_asimetria);
   div.innerHTML = `
-    <div>
-      <div class="flex items-start justify-between gap-2 mb-2">
-        <div>
-          <span class="text-xs font-bold text-emerald-400 px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-800/60 font-mono">
-            R/B 1 a ${card.ratio_riesgo_beneficio}
-          </span>
-          <h3 class="text-base font-bold text-white mt-1.5">${escapeHtml(card.ticker)}</h3>
-          <p class="text-xs text-slate-400">${escapeHtml(card.asset_name)}</p>
-        </div>
-        <div class="text-right font-mono">
-          <div class="text-xs font-bold text-emerald-400">${card.score_asimetria}/10 Score</div>
-          <div class="text-[11px] text-slate-400">${escapeHtml(card.horizonte_temporal)}</div>
-        </div>
+    <header class="ticket-header">
+      <div class="ticket-identity">
+        <div class="ticket-ticker">${escapeHtml(card.ticker || '—')} <span class="ticket-tag">LONG / VALOR</span></div>
+        <div class="ticket-name">${escapeHtml(card.asset_name || 'Activo sin nombre')}</div>
       </div>
-
-      <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800/80 space-y-1.5 my-3 text-xs font-mono">
-        <div class="flex justify-between">
-          <span class="text-slate-400">Entrada sugerida:</span>
-          <span class="text-white font-bold">${escapeHtml(card.nivel_entrada_sugerido)}</span>
-        </div>
-        ${card.stop_loss_sugerido ? `
-        <div class="flex justify-between">
-          <span class="text-slate-400">Stop invalidación:</span>
-          <span class="text-red-400 font-bold">${escapeHtml(card.stop_loss_sugerido)}</span>
-        </div>` : ''}
-        ${card.target_proyectado ? `
-        <div class="flex justify-between">
-          <span class="text-slate-400">Target proyectado:</span>
-          <span class="text-emerald-400 font-bold">${escapeHtml(card.target_proyectado)}</span>
-        </div>` : ''}
-        ${card.horario_mercado ? `
-        <div class="flex justify-between pt-1 border-t border-slate-800/80">
-          <span class="text-slate-400">Horario:</span>
-          <span class="${card.mercado_abierto ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}">
-            ${card.mercado_abierto ? '🟢 ABIERTO' : '🔴 CERRADO'}
-            <span class="text-slate-400 text-[10px] font-normal">(${escapeHtml(card.horario_mercado)})</span>
-          </span>
-        </div>` : ''}
-      </div>
-
-      <div class="space-y-2 text-xs">
-        <div>
-          <h4 class="font-bold text-amber-400 flex items-center gap-1.5">
-            <span>💡</span> Tesis Contrarian:
-          </h4>
-          <p class="text-slate-300 pl-4 border-l-2 border-amber-500/40 italic mt-1 leading-relaxed">
-            "${escapeHtml(card.tesis_contrarian)}"
-          </p>
-        </div>
-
-        <div>
-          <h4 class="font-bold text-cyan-400 flex items-center gap-1.5">
-            <span>⚡</span> Catalizador:
-          </h4>
-          <p class="text-slate-300 pl-4 border-l-2 border-cyan-500/40 mt-1 leading-relaxed">
-            ${escapeHtml(card.catalizador_detonante)}
-          </p>
-        </div>
-
-        <div>
-          <h4 class="font-bold text-slate-300 flex items-center gap-1.5">
-            <span>🏛️</span> Soporte Secular:
-          </h4>
-          <p class="text-slate-400 pl-4 border-l-2 border-slate-700 mt-1 leading-relaxed">
-            ${escapeHtml(card.soporte_secular)}
-          </p>
-        </div>
-      </div>
+      <div class="ticket-score"><span>${score}/10</span><span>${ratio}</span></div>
+    </header>
+    <div class="ticket-levels">
+      <div class="ticket-level"><small>ENTRADA</small><strong>${escapeHtml(card.nivel_entrada_sugerido || 'N/D')}</strong></div>
+      <div class="ticket-level stop"><small>STOP LOSS · −2× ATR</small><strong>${escapeHtml(card.stop_loss_sugerido || 'N/D')}</strong></div>
+      <div class="ticket-level target"><small>TARGET</small><strong>${escapeHtml(card.target_proyectado || 'N/D')}</strong></div>
     </div>
-
-    <div class="pt-3 border-t border-slate-800 space-y-2.5">
-      <div class="text-[11px] text-slate-400 flex items-center justify-between">
-        <span class="px-2 py-0.5 rounded bg-slate-900 border border-slate-800">${escapeHtml(card.sentimiento_mercado)}</span>
-        <span class="text-emerald-400 font-mono font-bold">Alta Asimetría</span>
-      </div>
-      <button onclick="openInjectModalWithCardIndex(${oppIndex})" class="w-full py-1.5 px-3 rounded-lg bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/40 hover:border-emerald-400 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-[0_0_10px_rgba(16,185,129,0.15)] cursor-pointer">
-        <span>🚀</span>
-        <span>Inyectar ${escapeHtml(card.ticker)} a Trading Ollama</span>
-      </button>
+    ${metrics ? `<div class="ticket-metrics">${metrics}</div>` : ''}
+    <div class="ticket-detail"><h4>Tesis contrarian</h4><p>${escapeHtml(card.tesis_contrarian || 'No incluida en el reporte')}</p></div>
+    <div class="ticket-detail catalyst"><h4>Catalizador</h4><p>${escapeHtml(card.catalizador_detonante || 'No incluido en el reporte')}</p></div>
+    <div class="ticket-detail support"><h4>Soporte secular</h4><p>${escapeHtml(card.soporte_secular || 'No incluido en el reporte')}</p></div>
+    <div class="ticket-footer">
+      <span>${escapeHtml(card.horizonte_temporal || 'Horizonte no informado')}</span>
+      <span>${escapeHtml(card.sentimiento_mercado || 'Sesgo contrarian')}</span>
     </div>
+    <button onclick="openInjectModalWithCardIndex(${oppIndex})" class="inject-button ticket-inject">
+      ↗ Inyectar ${escapeHtml(card.ticker || 'activo')} a Trading Ollama
+    </button>
   `;
   return div;
 }
 
-function createDangerCard(card) {
-  const div = document.createElement('div');
-  div.className = 'glass-card rounded-xl p-5 border-red-500/30 flex flex-col justify-between space-y-3';
+function createDangerCard(card, dangerIndex) {
+  const div = document.createElement('article');
+  div.className = 'trade-ticket danger-ticket';
+  const metrics = renderCardQuantMetrics(card);
+  const ratio = card.ratio_riesgo_beneficio == null
+    ? 'R/B N/D'
+    : `R/B 1:${escapeHtml(card.ratio_riesgo_beneficio)}`;
+  const score = card.score_asimetria == null ? 'N/D' : escapeHtml(card.score_asimetria);
   div.innerHTML = `
-    <div>
-      <div class="flex items-start justify-between gap-2 mb-2">
-        <div>
-          <span class="text-xs font-bold text-red-400 px-2 py-0.5 rounded bg-red-950/80 border border-red-800/60 font-mono">
-            ⚠️ TRAMPA DE MERCADO
-          </span>
-          <h3 class="text-base font-bold text-white mt-1">${escapeHtml(card.ticker)} (${escapeHtml(card.asset_name)})</h3>
-        </div>
-        <span class="text-xs font-mono text-red-400">Score ${card.score_asimetria}/10</span>
+    <header class="ticket-header">
+      <div class="ticket-identity">
+        <div class="ticket-ticker">${escapeHtml(card.ticker || '—')} <span class="ticket-tag">RIESGO / EUFORIA</span></div>
+        <div class="ticket-name">${escapeHtml(card.asset_name || 'Activo sin nombre')}</div>
       </div>
-
-      <p class="text-xs text-red-200/90 leading-relaxed bg-red-950/20 p-3 rounded-lg border border-red-900/40 my-2">
-        <strong>Peligro:</strong> ${escapeHtml(card.tesis_contrarian)}
-      </p>
-
-      <div class="text-xs text-slate-400 space-y-1">
-        <div><strong>Catalizador de Hype:</strong> ${escapeHtml(card.catalizador_detonante)}</div>
-        <div><strong>Recomendación:</strong> ${escapeHtml(card.nivel_entrada_sugerido)}</div>
-      </div>
+      <div class="ticket-score"><span>${score}/10</span><span>${ratio}</span></div>
+    </header>
+    <div class="ticket-levels">
+      <div class="ticket-level"><small>REFERENCIA</small><strong>${escapeHtml(card.nivel_entrada_sugerido || 'N/D')}</strong></div>
+      <div class="ticket-level stop"><small>INVALIDACIÓN</small><strong>${escapeHtml(card.stop_loss_sugerido || 'N/D')}</strong></div>
+      <div class="ticket-level target"><small>OBJETIVO</small><strong>${escapeHtml(card.target_proyectado || 'N/D')}</strong></div>
     </div>
+    ${metrics ? `<div class="ticket-metrics">${metrics}</div>` : ''}
+    <div class="ticket-detail"><h4>Señal de peligro</h4><p>${escapeHtml(card.tesis_contrarian || 'No incluida en el reporte')}</p></div>
+    <div class="ticket-detail catalyst"><h4>Catalizador de euforia</h4><p>${escapeHtml(card.catalizador_detonante || 'No incluido en el reporte')}</p></div>
+    <div class="ticket-detail support"><h4>Recomendación</h4><p>${escapeHtml(card.soporte_secular || 'Reducir exposición y evitar perseguir el precio.')}</p></div>
+    <div class="ticket-footer"><span>${escapeHtml(card.horizonte_temporal || 'Riesgo de reversión')}</span><span>Sesgo defensivo</span></div>
+    <button onclick="openInjectDangerCard(${dangerIndex})" class="inject-button ticket-inject">! Enviar alerta a Trading Ollama</button>
   `;
   return div;
 }
@@ -656,14 +586,18 @@ async function triggerScan(isAutomatic = false) {
         custom_directive: customDirective || null
       })
     });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || `Error HTTP ${res.status}`);
+    }
     const result = await res.json();
     await loadReportsList();
     await loadLatestReport();
 
     // Auto-transmisión desatendida a Trading Ollama si la casilla está activa
     const autoinjectEl = document.getElementById('radar-autoinject');
-    if (autoinjectEl && autoinjectEl.checked && currentActiveReport) {
-      await autoInjectReport(currentActiveReport, isAutomatic);
+    if (autoinjectEl && autoinjectEl.checked) {
+      await autoInjectReport(result, isAutomatic);
     }
 
     if (!isAutomatic) {
@@ -710,40 +644,37 @@ async function inspectTicker() {
     if (!res.ok) throw new Error("Ticker no encontrado");
     const data = await res.json();
 
-    const changeClass = data.change_pct_24h >= 0 ? 'text-emerald-400' : 'text-red-400';
-    let rsiBadge = '';
-    if (data.rsi_14 !== null) {
-      const rsiColor = data.rsi_14 < 30 ? 'text-emerald-400 bg-emerald-950/80 border-emerald-800' : (data.rsi_14 > 70 ? 'text-red-400 bg-red-950/80 border-red-800' : 'text-slate-300 bg-slate-900 border-slate-700');
-      rsiBadge = `<span class="px-1.5 py-0.5 rounded border text-[11px] ${rsiColor}">RSI(14): ${data.rsi_14}</span>`;
-    }
-
-    let schedLine = '';
-    if (data.schedule) {
-      const isOp = data.schedule.mercado_abierto;
-      const statusColor = isOp ? 'text-emerald-400 bg-emerald-950/80 border-emerald-800' : 'text-red-400 bg-red-950/80 border-red-800';
-      schedLine = `
-        <div class="flex flex-wrap items-center justify-between gap-1 pt-1.5 border-t border-slate-800/80 text-[11px]">
-          <div class="flex items-center gap-1.5">
-            <span class="px-1.5 py-0.5 rounded border font-bold ${statusColor}">${data.schedule.estado_texto}</span>
-            <span class="text-slate-400">${data.schedule.categoria} (${data.schedule.horario_argentina})</span>
-          </div>
-          <span class="${isOp ? 'text-emerald-400' : 'text-amber-400'} font-bold">${data.schedule.proxima_apertura}</span>
-        </div>
-      `;
-    }
+    const changePositive = data.change_pct_24h >= 0;
+    const metrics = [
+      ['RSI(14)', data.rsi_14, '', data.rsi_14 < 30 ? 'emerald' : (data.rsi_14 > 70 ? 'rose' : '')],
+      ['Z-Score(20)', data.z_score_20 === undefined || data.z_score_20 === null
+        ? data.z_score_20
+        : `${data.z_score_20 > 0 ? '+' : ''}${data.z_score_20}`, '', 'cyan'],
+      ['% vs 52w High', data.pct_from_52w_high, '%', ''],
+      ['EMA200', data.ema_200, '', ''],
+      ['ATR%', data.atr_pct, '%', ''],
+      ['RVOL', data.rvol_20, 'x', '']
+    ];
+    const metricPills = metrics
+      .filter(([, value]) => value !== undefined && value !== null && value !== '')
+      .map(([label, value, suffix, tone]) => `<span class="metric-pill ${tone}">${label} <strong>${escapeHtml(value)}${suffix}</strong></span>`)
+      .join('');
+    const schedule = data.schedule ? `
+      <div class="quote-schedule">
+        <span>${escapeHtml(data.schedule.estado_texto)} · ${escapeHtml(data.schedule.categoria)} (${escapeHtml(data.schedule.horario_argentina)})</span>
+        <strong>${escapeHtml(data.schedule.proxima_apertura)}</strong>
+      </div>` : '';
 
     resultDiv.innerHTML = `
-      <div class="w-full space-y-1">
-        <div class="flex justify-between items-center">
-          <strong class="text-white text-sm">${data.ticker}</strong>
-          <span class="font-bold text-white">${data.current_price} ${data.currency} <span class="${changeClass}">(${data.change_pct_24h > 0 ? '+' : ''}${data.change_pct_24h}%)</span></span>
+      <div class="quote-main">
+        <div><div class="quote-ticker">${escapeHtml(data.ticker)}</div>
+          <div class="quote-change ${changePositive ? 'emerald' : 'rose'}">${changePositive ? '+' : ''}${escapeHtml(data.change_pct_24h)}% · 24H</div>
         </div>
-        <div class="flex justify-between text-[11px] text-slate-400">
-          <span>Máx 52s: ${data.pct_from_52w_high}% | Mín: +${data.pct_from_52w_low}%</span>
-          ${rsiBadge}
-        </div>
-        ${schedLine}
+        <div class="quote-price">${escapeHtml(data.current_price)} <small>${escapeHtml(data.currency)}</small></div>
       </div>
+      <div class="quote-range">Rango 52 semanas · Máximo ${escapeHtml(data.pct_from_52w_high ?? 'N/D')}% · Mínimo +${escapeHtml(data.pct_from_52w_low ?? 'N/D')}%</div>
+      ${metricPills ? `<div class="quant-metrics">${metricPills}</div>` : ''}
+      ${schedule}
     `;
   } catch (err) {
     resultDiv.innerHTML = `<span class="text-red-400">No se encontraron datos para "${symbol}".</span>`;
@@ -751,7 +682,7 @@ async function inspectTicker() {
 }
 
 function escapeHtml(text) {
-  if (!text) return '';
+  if (text === null || text === undefined) return '';
   return String(text)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -762,13 +693,68 @@ function escapeHtml(text) {
 
 // --- Puente de Inyección a Trading Ollama (Puerto 18767) ---
 
+const NON_OPERABLE_TICKERS = new Set(["GENERAL", "DX-Y.NYB", "DXY", "NULL", "NONE", "N/A"]);
+
+function isOperableTicker(ticker) {
+  if (!ticker || typeof ticker !== "string") return false;
+  const cleaned = ticker.trim().toUpperCase();
+  if (!cleaned || NON_OPERABLE_TICKERS.has(cleaned)) return false;
+  return /^[A-Za-z0-9_=./^\-]+$/.test(cleaned);
+}
+
+function buildQuantitativeDirectiveText(card, fallbackText = "") {
+  if (!card) return fallbackText;
+  const quantMetrics = [];
+  if (card.rsi_14 !== undefined && card.rsi_14 !== null) {
+    quantMetrics.push(`RSI: ${card.rsi_14}`);
+  } else {
+    quantMetrics.push(`RSI: N/D`);
+  }
+  if (card.z_score_20 !== undefined && card.z_score_20 !== null) {
+    quantMetrics.push(`Z-Score: ${card.z_score_20 > 0 ? '+' : ''}${card.z_score_20}`);
+  } else {
+    quantMetrics.push(`Z-Score: N/D`);
+  }
+  if (card.pct_from_52w_high !== undefined && card.pct_from_52w_high !== null) {
+    quantMetrics.push(`% vs 52w High: ${card.pct_from_52w_high}%`);
+  } else {
+    quantMetrics.push(`% vs 52w High: N/D`);
+  }
+  if (card.ema_200 !== undefined && card.ema_200 !== null) {
+    quantMetrics.push(`EMA200: ${card.ema_200}`);
+  }
+  if (card.atr_pct !== undefined && card.atr_pct !== null) {
+    quantMetrics.push(`ATR%: ${card.atr_pct}%`);
+  }
+  if (card.rvol_20 !== undefined && card.rvol_20 !== null) {
+    quantMetrics.push(`RVOL: ${card.rvol_20}x`);
+  }
+
+  const parts = [`[${quantMetrics.join(" | ")}]`];
+  if (card.tesis_contrarian) {
+    parts.push(`Tesis Contrarian: ${card.tesis_contrarian}`);
+  } else if (fallbackText) {
+    parts.push(`Tesis Contrarian: ${fallbackText}`);
+  }
+  if (card.nivel_entrada_sugerido) parts.push(`Entrada: ${card.nivel_entrada_sugerido}`);
+  if (card.stop_loss_sugerido) parts.push(`SL: ${card.stop_loss_sugerido}`);
+  if (card.target_proyectado) parts.push(`TP: ${card.target_proyectado}`);
+  if (card.ratio_riesgo_beneficio) parts.push(`R/B: 1:${card.ratio_riesgo_beneficio}`);
+  if (card.horizonte_temporal) parts.push(`Horizonte: ${card.horizonte_temporal}`);
+  return parts.join(" | ");
+}
+
 function openInjectModal(card = null) {
   const modal = document.getElementById('inject-modal');
   if (!modal) return;
 
   // Si no se pasó una tarjeta específica, buscar en el reporte activo
-  if (!card && currentActiveReport && currentActiveReport.oportunidades && currentActiveReport.oportunidades.length > 0) {
-    card = currentActiveReport.oportunidades[0];
+  if (!card && currentActiveReport) {
+    if (currentActiveReport.oportunidades && currentActiveReport.oportunidades.length > 0) {
+      card = currentActiveReport.oportunidades.find(c => isOperableTicker(c.ticker)) || currentActiveReport.oportunidades[0];
+    } else if (currentActiveReport.alertas_peligro && currentActiveReport.alertas_peligro.length > 0) {
+      card = currentActiveReport.alertas_peligro.find(c => isOperableTicker(c.ticker)) || currentActiveReport.alertas_peligro[0];
+    }
   }
 
   let asset = "GENERAL";
@@ -782,15 +768,7 @@ function openInjectModal(card = null) {
     asset = card.ticker || "GENERAL";
     type = card.tipo === 'Trampa de Mercado / Peligro' ? 'Peligro' : 'Oportunidad';
     confidence = Math.min(100, Math.max(0, Math.round((card.score_asimetria || 8) * 10)));
-    
-    // Armar directiva estructurada con tesis y parámetros operativos
-    const parts = [];
-    if (card.tesis_contrarian) parts.push(card.tesis_contrarian);
-    if (card.nivel_entrada_sugerido) parts.push(`Nivel entrada sugerido: ${card.nivel_entrada_sugerido}`);
-    if (card.stop_loss_sugerido) parts.push(`Stop Loss defensivo: ${card.stop_loss_sugerido}`);
-    if (card.target_proyectado) parts.push(`Target proyectado: ${card.target_proyectado}`);
-    if (card.horizonte_temporal) parts.push(`Horizonte: ${card.horizonte_temporal}`);
-    text = parts.join(". ");
+    text = buildQuantitativeDirectiveText(card);
 
     if (card.horario_mercado) {
       isMarketOpen = card.mercado_abierto;
@@ -801,6 +779,7 @@ function openInjectModal(card = null) {
   } else if (currentActiveReport) {
     const guia = currentActiveReport.guia_operador;
     if (guia) {
+      type = guia.estado_semaforo === 'ALERTA DE PELIGRO' ? 'Peligro' : 'Neutral';
       text = guia.mensaje_principal || "Semáforo: ESPERAR / NO OPERAR. Sin asimetrías claras hoy.";
       if (guia.ticker_referencia) asset = guia.ticker_referencia;
       isMarketOpen = guia.mercado_abierto;
@@ -850,7 +829,8 @@ function openInjectModal(card = null) {
     text: text,
     confidence: confidence,
     type: type,
-    source: "Monitor de Mercado"
+    source: "Monitor del Mercado",
+    timestamp: new Date().toISOString()
   };
 
   modal.classList.remove('hidden');
@@ -859,8 +839,16 @@ function openInjectModal(card = null) {
 function openInjectModalWithCardIndex(idx) {
   if (currentActiveReport && currentActiveReport.oportunidades && currentActiveReport.oportunidades[idx]) {
     openInjectModal(currentActiveReport.oportunidades[idx]);
+  } else if (currentActiveReport && currentActiveReport.alertas_peligro && currentActiveReport.alertas_peligro[idx]) {
+    openInjectModal(currentActiveReport.alertas_peligro[idx]);
   } else {
     openInjectModal();
+  }
+}
+
+function openInjectDangerCard(idx) {
+  if (currentActiveReport && currentActiveReport.alertas_peligro && currentActiveReport.alertas_peligro[idx]) {
+    openInjectModal(currentActiveReport.alertas_peligro[idx]);
   }
 }
 
@@ -927,33 +915,45 @@ async function confirmInjection() {
 async function autoInjectReport(report, isAutomatic = false) {
   if (!report) return;
 
-  let asset = "GENERAL";
-  let type = "Oportunidad";
-  let confidence = 85;
-  let text = "";
+  const statusEl = document.getElementById('radar-autoinject-status');
+  const validOpps = (report.oportunidades || []).filter(opp => opp && isOperableTicker(opp.ticker));
+  const validDangers = (report.alertas_peligro || []).filter(d => d && isOperableTicker(d.ticker));
 
-  if (report.oportunidades && report.oportunidades.length > 0) {
-    const opp = report.oportunidades[0];
-    asset = opp.ticker || "GENERAL";
-    type = opp.tipo === 'Trampa de Mercado / Peligro' ? 'Peligro' : 'Oportunidad';
-    confidence = Math.min(100, Math.max(0, Math.round((opp.score_asimetria || 8) * 10)));
-    text = (report.guia_operador && report.guia_operador.mensaje_principal) || opp.tesis_contrarian;
+  let selectedCard = null;
+  let type = "Oportunidad";
+
+  if (validOpps.length > 0) {
+    selectedCard = validOpps[0];
+    type = selectedCard.tipo === 'Trampa de Mercado / Peligro' ? 'Peligro' : 'Oportunidad';
+  } else if (validDangers.length > 0) {
+    selectedCard = validDangers[0];
+    type = "Peligro";
   } else {
-    asset = (report.guia_operador && report.guia_operador.ticker_referencia) || "GENERAL";
-    type = "Oportunidad";
-    confidence = 80;
-    text = (report.guia_operador && report.guia_operador.mensaje_principal) || "Semáforo: ESPERAR / NO OPERAR. Disciplina de capital: mantener liquidez.";
+    if (statusEl) {
+      statusEl.className = "text-[10px] text-slate-400 font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-700 flex items-center gap-1.5";
+      statusEl.innerText = "Sin activo operable válido (se excluyen GENERAL y DX-Y.NYB): no se envió directiva.";
+      statusEl.classList.remove('hidden');
+    }
+    return;
   }
+
+  const asset = selectedCard.ticker.trim().toUpperCase();
+  if (!isOperableTicker(asset)) {
+    return;
+  }
+
+  const confidence = Math.min(100, Math.max(0, Math.round((selectedCard.score_asimetria || 8) * 10)));
+  const fallbackMsg = (report.guia_operador && report.guia_operador.mensaje_principal) || selectedCard.tesis_contrarian || "";
+  const text = buildQuantitativeDirectiveText(selectedCard, fallbackMsg);
 
   const payload = {
     asset: asset,
     text: text,
     confidence: confidence,
     type: type,
-    source: isAutomatic ? "Monitor de Mercado (Radar Continuo)" : "Monitor de Mercado"
+    source: isAutomatic ? "Monitor del Mercado (Auto)" : "Monitor del Mercado",
+    timestamp: new Date().toISOString()
   };
-
-  const statusEl = document.getElementById('radar-autoinject-status');
 
   try {
     const res = await fetch('/api/inject_to_trading_bot', {

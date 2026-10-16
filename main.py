@@ -5,6 +5,7 @@ Punto de entrada de línea de comandos (CLI).
 """
 
 import argparse
+import os
 import sys
 from rich.console import Console
 
@@ -17,7 +18,7 @@ from src.reporting.terminal_viewer import TerminalViewer
 console = Console()
 
 
-def check_environment():
+def check_environment() -> bool:
     """Verifica la salud de los servicios configurados (Ollama, carpetas)."""
     TerminalViewer.show_header()
     console.print("[bold yellow]Comprobando entorno del sistema...[/bold yellow]\n")
@@ -25,19 +26,41 @@ def check_environment():
     # Verificar Ollama
     ollama = OllamaClient()
     if ollama.is_available():
-        console.print(f"[green]✔ Ollama activo[/green] en {ollama.host} (Modelo configurado: {ollama.model})")
+        if ollama.is_model_available():
+            console.print(f"[green]✔ Ollama activo[/green] (Modelo disponible: {ollama.model})")
+            healthy = True
+        else:
+            console.print(
+                f"[red]✖ Ollama responde, pero el modelo '{ollama.model}' no está disponible.[/red] "
+                "Descárgalo con 'ollama pull' o configura OLLAMA_MODEL."
+            )
+            healthy = False
     else:
-        console.print(f"[red]✖ Ollama no responde[/red] en {ollama.host}. Asegúrate de iniciarlo con 'ollama serve'.")
+        console.print("[red]✖ Ollama no responde.[/red] Asegúrate de iniciarlo con 'ollama serve'.")
+        healthy = False
 
     # Directorio de reportes
-    console.print(f"[green]✔ Carpeta de reportes lista:[/green] {settings.reports_dir}")
+    reports_ready = settings.reports_dir.is_dir() and os.access(settings.reports_dir, os.W_OK)
+    if reports_ready:
+        console.print(f"[green]✔ Carpeta de reportes lista:[/green] {settings.reports_dir}")
+    else:
+        console.print(f"[red]✖ Carpeta de reportes no disponible para escritura:[/red] {settings.reports_dir}")
 
     # Feeds configurados
     feeds = settings.load_feeds()
     categories = feeds.get("categories", {})
     total_feeds = sum(len(c.get("feeds", [])) for c in categories.values())
-    console.print(f"[green]✔ Feeds configurados:[/green] {total_feeds} feeds en {len(categories)} categorías")
-    console.print("\n[bold green]Entorno verificado.[/bold green]")
+    feeds_ready = total_feeds > 0
+    if feeds_ready:
+        console.print(f"[green]✔ Feeds configurados:[/green] {total_feeds} feeds en {len(categories)} categorías")
+    else:
+        console.print("[red]✖ No hay feeds configurados.[/red]")
+    healthy = healthy and reports_ready and feeds_ready
+    if healthy:
+        console.print("\n[bold green]Entorno verificado.[/bold green]")
+    else:
+        console.print("\n[bold red]Entorno incompleto; corrige los errores indicados.[/bold red]")
+    return healthy
 
 
 def inspect_ticker(ticker: str):
@@ -97,7 +120,7 @@ def main():
         "--dashboard",
         "--web",
         action="store_true",
-        help="Inicia el Dashboard Web interactivo en http://localhost:8520 para ver fichas y operar el bot.",
+        help="Inicia el Dashboard Web local para consultar reportes, feeds y métricas de mercado.",
     )
     parser.add_argument(
         "--port",
@@ -116,8 +139,7 @@ def main():
     args = parser.parse_args()
 
     if args.check_env:
-        check_environment()
-        return
+        return 0 if check_environment() else 1
 
     if args.ticker:
         inspect_ticker(args.ticker)
@@ -134,5 +156,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
-
+    sys.exit(main() or 0)

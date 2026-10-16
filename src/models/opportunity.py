@@ -27,6 +27,8 @@ class OpportunityCard(BaseModel):
         description="Fundamento de viento de cola a largo plazo: por qué es una caída transitoria y no una quiebra"
     )
     ratio_riesgo_beneficio: float = Field(
+        gt=0,
+        allow_inf_nan=False,
         description="Ratio numérico proyectado Riesgo/Beneficio (mínimo 3.0 para Oportunidad Asimétrica)"
     )
     nivel_entrada_sugerido: str = Field(
@@ -67,6 +69,44 @@ class OpportunityCard(BaseModel):
         default=None,
         description="Categoría o tipo de activo según horarios de mercado"
     )
+    rsi_14: Optional[float] = Field(default=None, description="RSI(14) al momento de la evaluación")
+    z_score_20: Optional[float] = Field(default=None, description="Z-Score(20) al momento de la evaluación")
+    pct_from_52w_high: Optional[float] = Field(default=None, description="% de distancia desde el máximo de 52 semanas")
+    ema_200: Optional[float] = Field(default=None, description="EMA(200) diaria al momento de la evaluación")
+    atr_pct: Optional[float] = Field(default=None, description="ATR(14) porcentual sobre el precio actual")
+    rvol_20: Optional[float] = Field(default=None, description="Volumen relativo de 20 períodos")
+
+    @property
+    def entry_price_range(self) -> str:
+        return self.nivel_entrada_sugerido
+
+    @entry_price_range.setter
+    def entry_price_range(self, value: str) -> None:
+        self.nivel_entrada_sugerido = value
+
+    @property
+    def stop_loss(self) -> Optional[str]:
+        return self.stop_loss_sugerido
+
+    @stop_loss.setter
+    def stop_loss(self, value: Optional[str]) -> None:
+        self.stop_loss_sugerido = value
+
+    @property
+    def take_profit(self) -> Optional[str]:
+        return self.target_proyectado
+
+    @take_profit.setter
+    def take_profit(self, value: Optional[str]) -> None:
+        self.target_proyectado = value
+
+    @property
+    def risk_reward_ratio(self) -> float:
+        return self.ratio_riesgo_beneficio
+
+    @risk_reward_ratio.setter
+    def risk_reward_ratio(self, value: float) -> None:
+        self.ratio_riesgo_beneficio = value
 
 
 class AnalysisBatch(BaseModel):
@@ -153,4 +193,3 @@ class GuiaOperador(BaseModel):
         default=None,
         description="Instrucción antibot y advertencia de gap para novatos"
     )
-

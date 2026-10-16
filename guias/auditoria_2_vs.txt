@@ -1,0 +1,86 @@
+Actúa como ingeniero de software senior y responsable de calidad. Audita este repositorio de extremo a extremo y corrige los errores reales que encuentres. No te limites a dar recomendaciones: inspecciona el código, reproduce los problemas cuando sea posible, implementa reparaciones puntuales y verifica los resultados.
+
+## Contexto del proyecto
+
+Es una aplicación Python llamada “Monitor del Mercado”. Recopila noticias RSS, obtiene cotizaciones con yfinance, analiza información con Ollama o, opcionalmente, Google Gemini, genera reportes Markdown y ofrece un dashboard web. Incluye un lanzador para Windows (`lanzar-bot.bat`) y otro para Linux (`launch.sh`). El dashboard también contempla una integración opcional con una aplicación externa de trading en el puerto 18767.
+
+El objetivo normal del sistema es investigar y mostrar información: no debe realizar operaciones financieras reales ni enviar instrucciones a brokers.
+
+## Cómo trabajar
+
+1. Inspecciona primero la estructura, documentación, dependencias, historial y estado de Git. Lee los archivos relevantes antes de modificarlos.
+2. Conserva los cambios preexistentes del usuario. No sobrescribas ni reviertas cambios que no hayas hecho tú.
+3. Sigue el flujo real de ejecución desde los lanzadores y `main.py` hasta la ingesta, evaluación con IA, generación de reportes y dashboard. Comprueba también cómo se comunican las partes entre sí.
+4. Busca defectos demostrables, no cambios estéticos ni refactorizaciones especulativas. Para cada problema, intenta identificar la causa raíz y reproducirlo con una prueba, un comando o una explicación verificable.
+5. Corrige los problemas encontrados con cambios puntuales, coherentes con el estilo y la arquitectura existentes. No cambies la funcionalidad esperada sin justificarlo.
+6. No hagas commits, no publiques cambios, no elimines datos del proyecto y no ejecutes acciones destructivas. No imprimas ni compartas secretos. No ejecutes operaciones financieras, órdenes de trading ni llamadas que puedan generar cargos. Para servicios externos, usa mocks o pruebas seguras cuando sea posible.
+
+## Áreas que debes auditar
+
+- **Instalación y dependencias:** compatibilidad entre versiones de Python y paquetes; dependencias directas e indirectas; instalación limpia en entorno virtual; consistencia de `requirements.txt`; importaciones y arranque sin dependencias ausentes.
+- **Operatividad multiplataforma:** rutas y directorio de trabajo; uso de Python, entornos virtuales, variables de entorno, codificación de consola, puertos, navegador y señales de cierre en Windows y Linux. Comprueba que los lanzadores fallen con mensajes útiles y que no dependan de rutas absolutas de la computadora del autor.
+- **Integraciones:** formatos y errores de feeds RSS; respuestas incompletas o fallidas de yfinance; Ollama no instalado, detenido o sin el modelo configurado; errores y configuración opcional de Gemini; timeouts, respuestas inválidas y degradación controlada. Distingue con claridad una función opcional de una dependencia necesaria.
+- **Pipeline y lógica de negocio:** filtros, deduplicación, categorías, directivas personalizadas, tickers, cálculos y límites. Valida los datos externos antes de usarlos y comprueba que los errores no generen resultados ficticios presentados como reales.
+- **Modelos y reportes:** validación de Pydantic; campos opcionales; datos ausentes o mal formados; formato, nombres, codificación, rutas, fechas y lectura de reportes generados. Mantén coherentes el reporte, el terminal y el dashboard.
+- **Dashboard y API:** rutas, métodos HTTP, parámetros, tipos de contenido, códigos de respuesta, JSON inválido, errores durante los escaneos, archivos estáticos, manejo de puertos ocupados, cierre del servidor y coherencia entre frontend y backend.
+- **Seguridad y privacidad:** manejo de claves y `.env`; exposición de servicios y CORS; acceso a archivos y rutas de reportes; entradas no confiables; datos o secretos en logs; límites de peticiones. Examina especialmente la integración opcional con el servicio externo de trading, pero no la invoques ni envíes solicitudes reales.
+- **Calidad y pruebas:** casos límite, pruebas ausentes para defectos encontrados, confiabilidad de las pruebas y coherencia entre README, configuración y comportamiento actual.
+
+## Verificación requerida
+
+- Ejecuta primero las pruebas existentes y registra el resultado inicial.
+- Después de las correcciones, ejecuta las pruebas pertinentes y las comprobaciones de dependencias, compilación, lint o tipos que ya existan en el repositorio. No añadas herramientas innecesarias.
+- Si una comprobación requiere Internet, credenciales, un servicio externo o una aplicación que no está disponible, no inventes un resultado ni expongas secretos: indica la limitación y usa mocks o una prueba local segura cuando sea posible.
+- Prueba las rutas normales y los fallos previsibles: dependencias ausentes, servicio Ollama no disponible, datos externos vacíos o mal formados, puerto ocupado, petición inválida y ausencia de reportes.
+- Revisa el diff final para confirmar que no haya cambios accidentales, secretos, archivos generados ni modificaciones ajenas a la tarea.
+
+## Criterios de éxito
+
+Considera resuelto un problema solo si existe evidencia verificable: una prueba que pasa, un comando que funciona o una causa demostrada que ya no se reproduce. No afirmes que el proyecto está “libre de errores”; describe con precisión qué revisaste, qué arreglaste y qué quedó fuera de verificación.
+
+## Informe final
+
+Al terminar, responde en español con:
+1. Hallazgos principales, ordenados por severidad: crítico, alto, medio y bajo.
+2. Reparaciones realizadas, con archivos involucrados y explicación breve.
+3. Comandos de pruebas/verificación ejecutados y sus resultados.
+4. Problemas no resueltos o verificaciones bloqueadas, explicando por qué.
+5. Cualquier riesgo o limitación restante.
+
+No hagas un commit salvo que se te solicite expresamente.
+
+resultado
+
+1. Hallazgos principales
+Alto — Auto-inyección habilitada de forma predeterminada. El dashboard podía reenviar automáticamente una tesis al servicio local de Trading Ollama tras cada escaneo; la casilla aparecía marcada al abrirlo. Aunque no era una conexión directa a un broker, podía alimentar un sistema externo de trading sin una activación explícita en esa sesión.
+Alto — Fallo de IA presentado como análisis concluido. Si Ollama no respondía, el evaluador contaba noticias sin clasificar como “ruido” y generaba una conclusión que podía sugerir que no había oportunidades.
+Medio — Datos y guías inventados al leer reportes incompletos. El parser completaba campos ausentes con puntuaciones, ratios y tesis predeterminados; además, el dashboard podía fabricar una guía operativa para reportes que no la incluían.
+Medio — Datos de mercado potencialmente engañosos. Si faltaban extremos anuales en yfinance, se sustituían por máximos y mínimos de cierres, y valores no finitos podían llegar al modelo.
+Medio — Estado de Ollama incompleto y respuesta inválida mal manejada. Un proceso activo se mostraba como disponible aunque faltara el modelo configurado; una respuesta HTTP con JSON inválido podía terminar en un error secundario por una variable no inicializada.
+Medio — Operatividad e instalación. El lanzador Linux dependía de una ruta absoluta de esta computadora, faltaba el lanzador Windows mencionado en la documentación y Gemini, opcional, se instalaba como dependencia obligatoria.
+Medio — Fallos de feeds silenciosos y posible sobrescritura. Errores de descarga RSS podían parecer una ingesta vacía normal; reportes creados en el mismo segundo podían compartir nombre.
+Medio — Horario de futuros incompleto. La comprobación no respetaba la apertura dominical ni el cierre semanal que declaraba su propia configuración.
+No confirmé hallazgos críticos. También revisé las restricciones locales de la API y el rechazo de rutas de reportes fuera del directorio permitido.
+
+2. Reparaciones realizadas
+Desactivé por defecto la auto-inyección; la transmisión al servicio local sigue existiendo como función explícita. Ajusté también los mensajes de estado para que el monitor se describa como informativo, no como ejecutor de órdenes. Cambios en web/index.html, web/app.js, src/intelligence/contrarian_evaluator.py y src/ingestion/market_schedule.py.
+Ahora un diagnóstico de IA fallido o mal formado queda marcado como incompleto: no suma noticias al ruido descartado ni presenta ausencia de resultados como conclusión. Los errores técnicos se informan sin volcar contenido crudo o credenciales. Cambios en src/intelligence/contrarian_evaluator.py, src/intelligence/ollama_client.py y src/intelligence/gemini_client.py.
+El parser conserva como ausentes los campos no incluidos en un reporte y el dashboard ya no sintetiza una guía o datos de mercado para rellenarlos. Cambios en src/dashboard/report_parser.py y web/app.js.
+Validé precios, extremos y métricas de yfinance; si no hay máximos/mínimos auténticos, quedan sin informar en vez de derivarse de cierres. Añadí restricciones finitas y de rango a los modelos. Cambios en src/ingestion/market_data.py, src/models/asset_info.py y src/models/opportunity.py.
+Añadí comprobación del modelo configurado en Ollama y mensajes diferenciados cuando el servidor responde pero no tiene ese modelo. Cambios en src/intelligence/ollama_client.py, main.py, src/dashboard/server.py y web/app.js.
+Hice el lanzador Linux relativo al proyecto, añadí verificaciones y mensajes de dependencias, y agregué lanzar-bot.bat. Separé Gemini opcional en requirements-gemini.txt y declaré pandas directamente en requirements.txt. Actualicé README.md.
+RSS ahora registra fallos de transporte, HTTP y formato, limita el fallback a la descarga con timeout y omite entradas con campos inválidos. Los reportes evitan sobrescribirse si coinciden en fecha y hora. Cambios en src/ingestion/rss_collector.py y src/reporting/markdown_generator.py.
+3. Verificaciones
+Línea base, antes de las reparaciones: .venv/bin/python -m pytest -q — 16 passed.
+Tras los cambios: .venv/bin/python -m pytest -q — 27 passed. Las regresiones usan mocks para yfinance, RSS, Ollama y el dashboard; cubren JSON inválido, feed HTTP 503, ausencia de reportes, petición inválida, colisión de nombres y fallos de IA.
+.venv/bin/python -m pip check — sin dependencias rotas.
+Resolución offline sin instalar: pip install --dry-run --no-index -r requirements.txt y el equivalente para requirements-gemini.txt — ambos finalizaron correctamente en el entorno disponible.
+bash -n launch.sh, node --check web/app.js, python -m compileall -q config src main.py, python main.py --help y git diff --check — correctos.
+No se hicieron solicitudes al servicio de Trading Ollama en el puerto 18767 ni a feeds, yfinance, Gemini u Ollama reales.
+4. Límites y riesgos restantes
+No hice una instalación limpia en un entorno virtual nuevo ni una prueba con Internet: la comprobación de dependencias fue offline y sobre el .venv ya existente.
+El lanzador Windows se revisó estáticamente; no se pudo ejecutar cmd.exe en Linux.
+No había lint ni type-check configurados para ejecutar.
+Los calendarios de mercado siguen siendo estimaciones locales: no cubren cierres excepcionales ni todos los feriados y pausas de cada mercado. El horario de futuros refleja la ventana semanal configurada, no una fuente oficial en vivo.
+La integración con Trading Ollama sigue disponible si se activa o confirma explícitamente; no comprobé cómo el servicio receptor interpreta esa tesis.
+El árbol ya tenía modificaciones locales y archivos sin seguimiento antes de terminar la auditoría. Los preservé; no alteré los reportes ni .env, no hice commit ni publiqué cambios.

@@ -1,7 +1,10 @@
 import json
+import logging
 import re
 from typing import Any, Dict, Optional
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class GeminiClient:
@@ -16,7 +19,11 @@ class GeminiClient:
             try:
                 from google import genai
                 self._client = genai.Client(api_key=self.api_key)
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "No se pudo inicializar Gemini (%s); el motor no estará disponible.",
+                    type(exc).__name__,
+                )
                 self._client = None
 
     def is_available(self) -> bool:

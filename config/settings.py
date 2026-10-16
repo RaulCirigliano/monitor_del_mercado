@@ -20,10 +20,12 @@ class Settings:
         # Garantizar que el directorio de reportes exista
         self.reports_dir.mkdir(parents=True, exist_ok=True)
 
-        # Ollama local
+        # Ollama local (optimizado en RAM y contexto para convivir con trading_ollama)
         self.ollama_host: str = os.getenv("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
         self.ollama_model: str = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
         self.ollama_timeout: float = float(os.getenv("OLLAMA_TIMEOUT", "180"))
+        self.ollama_temperature: float = float(os.getenv("OLLAMA_TEMPERATURE", "0.1"))
+        self.ollama_num_ctx: int = int(os.getenv("OLLAMA_NUM_CTX", "4096"))
 
         # Gemini Cloud (motor secundario opcional)
         self.gemini_api_key: str = os.getenv("GEMINI_API_KEY", "").strip()
