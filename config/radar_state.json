@@ -3,6 +3,6 @@
   "label": "Cada 2 horas",
   "cron_expression": "0 */2 * * *",
   "engine": "ollama",
-  "model": "qwen2.5:7b",
+  "model": "deepseek-r1:8b",
   "auto_inject": true
 }
