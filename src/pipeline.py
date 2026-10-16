@@ -29,10 +29,10 @@ class MarketMonitorPipeline:
     ]
     BENCHMARK_TICKERS = KEY_TICKERS
 
-    def __init__(self, use_gemini: bool = False):
+    def __init__(self, use_gemini: bool = False, model: Optional[str] = None):
         self.collector = RSSCollector()
         self.market_fetcher = MarketDataFetcher()
-        self.evaluator = ContrarianEvaluator(use_gemini=use_gemini)
+        self.evaluator = ContrarianEvaluator(use_gemini=use_gemini, model=model)
         self.report_generator = MarkdownReportGenerator()
 
     @classmethod

@@ -1,10 +1,14 @@
 import json
 import logging
 import mimetypes
+import os
+import re
 import webbrowser
 from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs, urlsplit
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from config import settings
 from src.ingestion.market_data import MarketDataFetcher
@@ -13,7 +17,21 @@ from src.pipeline import MarketMonitorPipeline
 from src.dashboard.report_parser import parse_markdown_report
 
 WEB_DIR = Path(__file__).resolve().parent.parent.parent / "web"
+RADAR_STATE_FILE = Path(__file__).resolve().parent.parent.parent / "config" / "radar_state.json"
 logger = logging.getLogger(__name__)
+TRADING_API_BASE = os.environ.get("TRADING_OLLAMA_API_URL", "http://127.0.0.1:18767").rstrip("/")
+SHARED_DIRECTIVES_PATH = Path(os.environ.get(
+    "TRADING_OLLAMA_PROJECT_DIR",
+    Path(__file__).resolve().parents[3] / "trading_ollama",
+)) / "guias" / "directivas_cerebro.md"
+
+VALID_RADAR_INTERVALS = {
+    0: {"label": "Desactivado", "cron": None},
+    15: {"label": "Cada 15 min", "cron": "*/15 * * * *"},
+    30: {"label": "Cada 30 min", "cron": "*/30 * * * *"},
+    60: {"label": "Cada 60 min", "cron": "0 * * * *"},
+    120: {"label": "Cada 2 horas", "cron": "0 */2 * * *"},
+}
 
 
 class DashboardRequestHandler(BaseHTTPRequestHandler):
@@ -21,6 +39,63 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
     MAX_REQUEST_BODY = 1_000_000
     _market_fetcher = MarketDataFetcher()
+    _last_ollama_models: list[str] = []
+
+    @classmethod
+    def _load_radar_config(cls) -> dict:
+        default_cfg = {
+            "interval_minutes": 0,
+            "label": "Desactivado",
+            "cron_expression": None,
+            "engine": "ollama",
+            "model": None,
+            "auto_inject": False,
+        }
+        try:
+            if RADAR_STATE_FILE.exists():
+                raw = json.loads(RADAR_STATE_FILE.read_text(encoding="utf-8"))
+                interval = int(raw.get("interval_minutes", 0))
+                if interval not in VALID_RADAR_INTERVALS:
+                    interval = 0
+                meta = VALID_RADAR_INTERVALS[interval]
+                return {
+                    "interval_minutes": interval,
+                    "label": meta["label"],
+                    "cron_expression": meta["cron"],
+                    "engine": str(raw.get("engine", "ollama")),
+                    "model": str(raw.get("model", "")) or None,
+                    "auto_inject": bool(raw.get("auto_inject", False)),
+                }
+        except Exception as exc:
+            logger.warning("No se pudo leer radar_state.json (%s)", exc)
+        return default_cfg
+
+    @classmethod
+    def _save_radar_config(cls, data: dict) -> dict:
+        current = cls._load_radar_config()
+        if "interval_minutes" in data:
+            try:
+                interval = int(data["interval_minutes"])
+            except (TypeError, ValueError):
+                interval = current["interval_minutes"]
+            if interval not in VALID_RADAR_INTERVALS:
+                raise ValueError(f"Intervalo inválido. Valores permitidos: {list(VALID_RADAR_INTERVALS.keys())}")
+            current["interval_minutes"] = interval
+            current["label"] = VALID_RADAR_INTERVALS[interval]["label"]
+            current["cron_expression"] = VALID_RADAR_INTERVALS[interval]["cron"]
+        if "engine" in data and isinstance(data["engine"], str):
+            current["engine"] = data["engine"]
+        if "model" in data:
+            model = data["model"]
+            current["model"] = model if isinstance(model, str) and model else None
+        if "auto_inject" in data:
+            current["auto_inject"] = bool(data["auto_inject"])
+        try:
+            RADAR_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            RADAR_STATE_FILE.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
+        except Exception as exc:
+            logger.warning("No se pudo guardar radar_state.json (%s)", exc)
+        return current
 
     def _set_headers(self, status: int = 200, content_type: str = "application/json"):
         self.send_response(status)
@@ -82,6 +157,48 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(b'{"error":"Solo se permiten solicitudes locales"}')
         return True
 
+    @staticmethod
+    def _request_trading_brain(path: str, method: str = "GET", payload: dict | None = None):
+        headers = {}
+        api_token = (
+            os.environ.get("TRADING_OLLAMA_API_TOKEN")
+            or os.environ.get("APP_SECRET_TOKEN")
+            or os.environ.get("APP_TOKEN")
+            or ""
+        ).strip()
+        if not api_token:
+            try:
+                from dotenv import dotenv_values
+
+                trading_root = Path(os.environ.get(
+                    "TRADING_OLLAMA_PROJECT_DIR",
+                    Path(__file__).resolve().parents[3] / "trading_ollama",
+                ))
+                trading_config = dotenv_values(trading_root / ".env")
+                api_token = str(
+                    trading_config.get("APP_SECRET_TOKEN")
+                    or trading_config.get("APP_TOKEN")
+                    or ""
+                ).strip()
+            except ImportError:
+                api_token = ""
+        if api_token:
+            headers["X-API-Token"] = api_token
+        body = None
+        if payload is not None:
+            headers["Content-Type"] = "application/json"
+            body = json.dumps(payload).encode("utf-8")
+        request = Request(f"{TRADING_API_BASE}{path}", data=body, headers=headers, method=method)
+        with urlopen(request, timeout=4) as response:
+            return response.status, json.loads(response.read().decode("utf-8"))
+
+    @staticmethod
+    def _shared_brain_directives() -> str:
+        try:
+            return SHARED_DIRECTIVES_PATH.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise RuntimeError("No se pudieron leer las directivas canónicas compartidas.") from exc
+
     def do_OPTIONS(self):
         self._set_headers(405)
 
@@ -94,7 +211,43 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         query = parse_qs(parsed.query)
 
         # 1. Rutas de la API REST
-        if path == "/api/status":
+        if path == "/api/system/models":
+            try:
+                _, payload = self._request_trading_brain("/api/system/models")
+                models = payload.get("models", []) if isinstance(payload, dict) else []
+                if isinstance(models, list):
+                    type(self)._last_ollama_models = models
+                self._set_headers(200)
+                self.wfile.write(json.dumps(payload).encode("utf-8"))
+            except (HTTPError, URLError, TimeoutError, OSError, ValueError) as exc:
+                logger.warning("No se pudo consultar modelos centrales (%s).", type(exc).__name__)
+                self._set_headers(200)
+                self.wfile.write(json.dumps({
+                    "available": False,
+                    "models": type(self)._last_ollama_models,
+                    "error": "Trading Ollama no está disponible; se conserva la última lista conocida."
+                    if type(self)._last_ollama_models
+                    else "Trading Ollama no está disponible y no hay modelos en caché.",
+                }).encode("utf-8"))
+            return
+
+        if path == "/api/system/brain":
+            try:
+                _, payload = self._request_trading_brain("/api/system/brain")
+                self._set_headers(200)
+                self.wfile.write(json.dumps(payload).encode("utf-8"))
+            except (HTTPError, URLError, TimeoutError, OSError, ValueError) as exc:
+                logger.warning("No se pudo consultar el cerebro central (%s).", type(exc).__name__)
+                cfg = self._load_radar_config()
+                self._set_headers(200)
+                self.wfile.write(json.dumps({
+                    "engine": cfg.get("engine", "ollama"),
+                    "model": cfg.get("model"),
+                    "available": False,
+                }).encode("utf-8"))
+            return
+
+        elif path == "/api/status":
             ollama = OllamaClient()
             ollama_online = ollama.is_available()
             feeds = settings.load_feeds().get("categories", {})
@@ -109,9 +262,15 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 ),
                 "reports_count": len(reports),
                 "total_feeds": total_feeds,
+                "radar_config": self._load_radar_config(),
             }
             self._set_headers(200)
             self.wfile.write(json.dumps(payload).encode("utf-8"))
+            return
+
+        elif path == "/api/cio/config":
+            self._set_headers(200)
+            self.wfile.write(json.dumps(self._load_radar_config()).encode("utf-8"))
             return
 
         elif path == "/api/reports":
@@ -234,6 +393,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     custom_directive=custom_directive or None,
                     limit_tickers=limit,
                 )
+                candidates["radar_config"] = self._load_radar_config()
                 self._set_headers(200)
                 self.wfile.write(json.dumps(candidates, default=str).encode("utf-8"))
             except Exception as e:
@@ -417,7 +577,40 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             return
 
         parsed = urlparse(self.path)
-        if parsed.path == "/api/scan":
+        if parsed.path == "/api/system/brain":
+            try:
+                data = self._read_json_body()
+                engine = data.get("engine")
+                model = data.get("model")
+                if engine not in {"ollama", "gemini", "local", "antigravity_cio"}:
+                    raise ValueError("Motor de cerebro inválido.")
+                if model is not None and (
+                    not isinstance(model, str)
+                    or len(model) > 120
+                    or not re.fullmatch(r"[A-Za-z0-9._:/-]+", model)
+                    or any(part in {"", ".", ".."} for part in model.split("/"))
+                ):
+                    raise ValueError("Nombre de modelo inválido.")
+                status, payload = self._request_trading_brain(
+                    "/api/system/brain",
+                    method="POST",
+                    payload={"engine": engine, "model": model},
+                )
+                self._save_radar_config({"engine": engine, "model": model})
+                self._set_headers(status)
+                self.wfile.write(json.dumps(payload).encode("utf-8"))
+            except ValueError as exc:
+                self._set_headers(400)
+                self.wfile.write(json.dumps({"error": str(exc)}).encode("utf-8"))
+            except HTTPError as exc:
+                self._set_headers(exc.code)
+                self.wfile.write(json.dumps({"error": "Trading Ollama rechazó la selección."}).encode("utf-8"))
+            except (URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                logger.warning("No se pudo actualizar el cerebro central (%s).", type(exc).__name__)
+                self._set_headers(502)
+                self.wfile.write('{"error":"No se pudo guardar la selección en Trading Ollama."}'.encode("utf-8"))
+
+        elif parsed.path == "/api/scan":
             try:
                 data = self._read_json_body()
             except ValueError as e:
@@ -427,6 +620,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
             category = data.get("category")
             custom_directive = data.get("custom_directive")
+            engine = data.get("engine", "ollama")
+            model = data.get("model")
             valid_categories = set(settings.load_feeds().get("categories", {}))
             if category is not None and (
                 not isinstance(category, str) or category not in valid_categories
@@ -440,10 +635,25 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self._set_headers(400)
                 self.wfile.write('{"error":"Directiva inválida (máximo 500 caracteres)"}'.encode("utf-8"))
                 return
+            if engine not in {"ollama", "gemini"}:
+                self._set_headers(400)
+                self.wfile.write('{"error":"Motor de análisis inválido para escaneo."}'.encode("utf-8"))
+                return
+            if model is not None and (
+                not isinstance(model, str)
+                or len(model) > 120
+                or not re.fullmatch(r"[A-Za-z0-9._:/-]+", model)
+            ):
+                self._set_headers(400)
+                self.wfile.write('{"error":"Nombre de modelo inválido."}'.encode("utf-8"))
+                return
 
             # Ejecutar escaneo a través del pipeline
             try:
-                pipeline = MarketMonitorPipeline()
+                pipeline = MarketMonitorPipeline(
+                    use_gemini=engine == "gemini",
+                    model=model,
+                )
                 batch = pipeline.run(
                     category_filter=category,
                     custom_directive=custom_directive,
@@ -462,6 +672,15 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self._handle_inject_to_trading_bot()
         elif parsed.path == "/api/cio/publish":
             self._handle_cio_publish()
+        elif parsed.path == "/api/cio/config":
+            try:
+                data = self._read_json_body()
+                saved = self._save_radar_config(data)
+                self._set_headers(200)
+                self.wfile.write(json.dumps(saved, ensure_ascii=False).encode("utf-8"))
+            except ValueError as e:
+                self._set_headers(400)
+                self.wfile.write(json.dumps({"error": str(e)}, ensure_ascii=False).encode("utf-8"))
         else:
             self._set_headers(404)
             self.wfile.write(b'{"error": "Ruta no encontrada"}')
@@ -533,12 +752,13 @@ def start_dashboard_server(port: int = 8520):
     server = ThreadingHTTPServer(("127.0.0.1", active_port), DashboardRequestHandler)
     dashboard_url = f"http://localhost:{active_port}"
     print(f"\n🚀 Dashboard de Monitor del Mercado activo en: {dashboard_url}")
-    try:
-        if not webbrowser.open(dashboard_url):
-            print(f"👉 Abre {dashboard_url} en tu navegador.\n")
-    except webbrowser.Error as exc:
-        print(f"👉 No se pudo abrir el navegador automáticamente: {exc}")
-        print(f"   Abre {dashboard_url} manualmente.\n")
+    if not os.environ.get("MONITOR_NO_BROWSER"):
+        try:
+            if not webbrowser.open(dashboard_url):
+                print(f"👉 Abre {dashboard_url} en tu navegador.\n")
+        except webbrowser.Error as exc:
+            print(f"👉 No se pudo abrir el navegador automáticamente: {exc}")
+            print(f"   Abre {dashboard_url} manualmente.\n")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

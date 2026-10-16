@@ -548,6 +548,60 @@ def test_dashboard_auto_injection_is_disabled_by_default():
     assert "checked" not in checkbox
 
 
+def test_monitor_proxy_forwards_shared_brain_token_and_selection(monkeypatch):
+    import json
+    from src.dashboard import server
+
+    captured = {}
+
+    class FakeResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b'{"engine":"ollama","model":"deepseek-r1:8b"}'
+
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        captured["token"] = request.get_header("X-api-token")
+        captured["method"] = request.get_method()
+        captured["body"] = json.loads(request.data.decode("utf-8"))
+        captured["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setenv("TRADING_OLLAMA_API_TOKEN", "local-test-token")
+    monkeypatch.setattr(server, "urlopen", fake_urlopen)
+
+    status, payload = server.DashboardRequestHandler._request_trading_brain(
+        "/api/system/brain",
+        method="POST",
+        payload={"engine": "ollama", "model": "deepseek-r1:8b"},
+    )
+
+    assert status == 200
+    assert payload == {"engine": "ollama", "model": "deepseek-r1:8b"}
+    assert captured == {
+        "url": "http://127.0.0.1:18767/api/system/brain",
+        "token": "local-test-token",
+        "method": "POST",
+        "body": {"engine": "ollama", "model": "deepseek-r1:8b"},
+        "timeout": 4,
+    }
+
+
+def test_pipeline_uses_selected_ollama_model():
+    from src.pipeline import MarketMonitorPipeline
+
+    pipeline = MarketMonitorPipeline(model="deepseek-r1:8b")
+
+    assert pipeline.evaluator.ollama.model == "deepseek-r1:8b"
+
+
 def test_commodity_schedule_respects_sunday_opening_and_friday_close():
     from datetime import datetime, timezone, timedelta
     from src.ingestion.market_schedule import MarketSchedule
@@ -1046,5 +1100,4 @@ def test_report_parser_motor_evaluador(tmp_path):
     )
     parsed_ollama = parse_markdown_report(ollama_md)
     assert parsed_ollama["motor_evaluador"] == "Ollama Local"
-
 

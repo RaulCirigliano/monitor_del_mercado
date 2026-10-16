@@ -1,0 +1,8 @@
+{
+  "interval_minutes": 120,
+  "label": "Cada 2 horas",
+  "cron_expression": "0 */2 * * *",
+  "engine": "ollama",
+  "model": "qwen2.5:7b",
+  "auto_inject": true
+}

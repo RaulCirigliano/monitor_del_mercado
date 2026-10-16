@@ -87,6 +87,7 @@ python main.py --web --port 8520
 ```
 Abre en tu navegador `http://localhost:8520` para interactuar en tiempo real con el sistema, lanzar escaneos por categoría, analizar tickers al instante y explorar las fichas y conclusiones del motor.
 El dashboard escucha solo en `127.0.0.1`; no está pensado para acceso desde otros equipos. La auto-inyección al servicio local de Trading Ollama es opcional y está desactivada por defecto; activarla transmite una tesis al servicio externo, pero el monitor no ejecuta operaciones ni se conecta a brokers.
+Con Trading Ollama en ejecución, el selector de cerebro carga los modelos instalados en Ollama y sincroniza la selección central entre ambas interfaces. El lanzador integrado `lanzar_todo.py` está en la raíz del proyecto Trading Ollama; puede usarse desde allí para iniciar y supervisar ambos sistemas.
 
 ---
 

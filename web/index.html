@@ -24,7 +24,7 @@
       <div id="ollama-status" class="status-chip">
         <span class="status-dot live"></span><span>Ollama: <strong>Verificando</strong></span>
       </div>
-      <div id="mode-badge" class="status-chip mode-chip">Modo: <strong>Inferencia Progresiva</strong></div>
+      <div id="mode-badge" class="status-chip mode-chip">Motor: <strong>Ollama Local</strong></div>
       <div id="radar-countdown-badge" class="status-chip radar-chip hidden">
         <span class="status-dot cyan-pulse"></span>
         <span>RADAR <strong id="radar-countdown-text">60:00</strong></span>
@@ -62,8 +62,10 @@
         </select>
         <label class="field-label" for="scan-engine">Motor de inteligencia contrarian</label>
         <select id="scan-engine">
-          <option value="ollama" selected>🤖 Ollama Local (qwen2.5:3b · VRAM)</option>
+          <option value="ollama|qwen2.5:3b" selected>🤖 Ollama · qwen2.5:3b</option>
+          <option value="gemini">☁️ Google Gemini</option>
           <option value="antigravity_cio">🏛️ Antigravity CIO (Razonamiento Superior · Zero-RAM)</option>
+          <option value="local" disabled>⚙️ Matemático Local (solo Trading)</option>
         </select>
         <button id="btn-scan" onclick="triggerScan()" class="primary-button">
           <span id="scan-spinner" class="hidden">◌</span>

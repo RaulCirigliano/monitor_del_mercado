@@ -30,6 +30,117 @@ let allReportsCache = [];
 let currentReportsTab = 'vigentes';
 let activeReportPath = null;
 let currentActiveReport = null;
+let centralBrainSelection = { engine: 'ollama', model: null };
+
+function parseBrainSelection(value) {
+  if (typeof value === 'string' && value.startsWith('ollama|')) {
+    return { engine: 'ollama', model: value.slice('ollama|'.length) };
+  }
+  return { engine: value, model: null };
+}
+
+function brainSelectionValue(brain) {
+  if (brain?.engine === 'ollama' && brain.model) return `ollama|${brain.model}`;
+  return brain?.engine || 'ollama';
+}
+
+function updateHeaderEngineStatus() {
+  const modeBadge = document.getElementById('mode-badge');
+  const engineEl = document.getElementById('scan-engine');
+  if (!modeBadge) return;
+
+  const rawVal = engineEl ? engineEl.value : (centralBrainSelection ? brainSelectionValue(centralBrainSelection) : 'ollama|qwen2.5:3b');
+  const selection = parseBrainSelection(rawVal);
+
+  if (selection.engine === 'antigravity_cio') {
+    modeBadge.className = 'status-chip mode-chip border border-purple-500/40 bg-purple-950/50 text-purple-200';
+    modeBadge.innerHTML = 'Motor: <strong class="text-purple-300">🏛️ Antigravity CIO</strong>';
+  } else if (selection.engine === 'gemini') {
+    modeBadge.className = 'status-chip mode-chip border border-sky-500/40 bg-sky-950/50 text-sky-200';
+    modeBadge.innerHTML = 'Motor: <strong class="text-sky-300">☁️ Google Gemini</strong>';
+  } else if (selection.engine === 'ollama') {
+    const modelName = selection.model || 'qwen2.5:3b';
+    modeBadge.className = 'status-chip mode-chip border border-emerald-500/40 bg-emerald-950/50 text-emerald-200';
+    modeBadge.innerHTML = `Motor: <strong class="text-emerald-300">🤖 ${escapeHtml(modelName)}</strong>`;
+  } else {
+    modeBadge.className = 'status-chip mode-chip';
+    modeBadge.innerHTML = `Motor: <strong>${escapeHtml(selection.engine)}</strong>`;
+  }
+}
+
+async function loadBrainModels() {
+  const modelsResponse = await fetch('/api/system/models');
+  if (!modelsResponse.ok) throw new Error(`HTTP ${modelsResponse.status} cargando los modelos.`);
+  const modelsData = await modelsResponse.json();
+  const brainResponse = await fetch('/api/system/brain');
+  if (!brainResponse.ok) throw new Error(`HTTP ${brainResponse.status} cargando el cerebro central.`);
+  const brain = await brainResponse.json();
+  centralBrainSelection = { engine: brain.engine, model: brain.model || null };
+
+  const select = document.getElementById('scan-engine');
+  if (!select) return;
+  const models = Array.isArray(modelsData.models) ? modelsData.models : [];
+  const current = brainSelectionValue(centralBrainSelection);
+  if (centralBrainSelection.engine === 'ollama' && centralBrainSelection.model && !models.includes(centralBrainSelection.model)) {
+    models.push(centralBrainSelection.model);
+  }
+
+  const unavailableOption = new Option('🤖 Ollama · Selecciona modelo', 'ollama|');
+  unavailableOption.disabled = true;
+  select.replaceChildren(
+    ...[...new Set(models)].sort((a, b) => a.localeCompare(b)).map(model => new Option(`🤖 Ollama · ${model}`, `ollama|${model}`)),
+    new Option('☁️ Google Gemini', 'gemini'),
+    new Option('🏛️ Antigravity CIO (recopilar candidatos)', 'antigravity_cio'),
+    new Option('⚙️ Matemático Local (solo Trading)', 'local')
+  );
+  if (!models.length) select.add(unavailableOption, 0);
+  const localOption = Array.from(select.options).find(option => option.value === 'local');
+  if (localOption) localOption.disabled = true;
+  select.value = Array.from(select.options).some(option => option.value === current)
+    ? current
+    : (models.length ? `ollama|${models[0]}` : 'gemini');
+  if (!modelsData.available) console.warn(modelsData.error || 'Ollama no disponible.');
+  updateHeaderEngineStatus();
+}
+
+async function saveBrainSelection(value) {
+  const selection = parseBrainSelection(value);
+  if (selection.engine === 'ollama' && !selection.model) return;
+  const response = await fetch('/api/system/brain', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(selection),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || `HTTP ${response.status} guardando el cerebro.`);
+  }
+  centralBrainSelection = selection;
+  updateHeaderEngineStatus();
+  await syncRadarConfigToServer();
+}
+
+function startBrainSyncPolling() {
+  loadBrainModels().catch(error => console.warn('No se pudo cargar el cerebro central:', error));
+  setInterval(async () => {
+    try {
+      const response = await fetch('/api/system/brain');
+      if (!response.ok) return;
+      const brain = await response.json();
+      const value = brainSelectionValue(brain);
+      const select = document.getElementById('scan-engine');
+      if (select && !Array.from(select.options).some(option => option.value === value)) {
+        await loadBrainModels();
+      } else if (select) {
+        select.value = value;
+      }
+      centralBrainSelection = { engine: brain.engine, model: brain.model || null };
+      updateHeaderEngineStatus();
+    } catch (error) {
+      console.warn('No se pudo sincronizar el cerebro central:', error);
+    }
+  }, 8000);
+}
 let currentInjectPayload = null;
 let radarTimerInterval = null;
 let radarCountdownSeconds = 0;
@@ -255,10 +366,38 @@ async function deleteActiveReport() {
   }
 }
 
-function toggleContinuousRadar() {
+async function syncRadarConfigToServer() {
+  const select = document.getElementById('radar-interval');
+  const engineEl = document.getElementById('scan-engine');
+  const autoinjectEl = document.getElementById('radar-autoinject');
+  const intervalMin = select ? parseInt(select.value, 10) || 0 : 0;
+  const selection = parseBrainSelection(engineEl ? engineEl.value : 'ollama|');
+  const autoInject = autoinjectEl ? Boolean(autoinjectEl.checked) : false;
+
+  try {
+    await fetch('/api/cio/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        interval_minutes: intervalMin,
+        engine: selection.engine,
+        model: selection.model,
+        auto_inject: autoInject,
+      })
+    });
+  } catch (err) {
+    console.warn("No se pudo sincronizar radar_config con el servidor:", err);
+  }
+}
+
+function toggleContinuousRadar(skipSync = false) {
   const select = document.getElementById('radar-interval');
   const badge = document.getElementById('radar-countdown-badge');
   const intervalMin = parseInt(select.value, 10);
+
+  if (!skipSync) {
+    syncRadarConfigToServer();
+  }
 
   if (radarTimerInterval) {
     clearInterval(radarTimerInterval);
@@ -583,7 +722,8 @@ async function triggerScan(isAutomatic = false) {
   const btnText = document.getElementById('scan-btn-text');
   const category = document.getElementById('scan-category').value;
   const engineEl = document.getElementById('scan-engine');
-  const engine = engineEl ? engineEl.value : 'ollama';
+  const selection = parseBrainSelection(engineEl ? engineEl.value : 'ollama|');
+  const engine = selection.engine;
 
   btn.disabled = true;
   spinner.classList.remove('hidden');
@@ -592,6 +732,10 @@ async function triggerScan(isAutomatic = false) {
     : (isAutomatic ? "Radar continuo escaneando..." : "Escaneando mercado e IA...");
 
   try {
+    if (engine === 'local') {
+      throw new Error('El motor matemático local solo está disponible en Trading Ollama.');
+    }
+
     if (engine === 'antigravity_cio') {
       const params = new URLSearchParams();
       if (category) params.append('category', category);
@@ -625,7 +769,9 @@ async function triggerScan(isAutomatic = false) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         category: category || null,
-        custom_directive: customDirective || null
+        custom_directive: customDirective || null,
+        engine,
+        model: selection.model,
       })
     });
     if (!res.ok) {
@@ -1030,9 +1176,43 @@ async function autoInjectReport(report, isAutomatic = false) {
   }
 }
 
+async function loadRadarConfigFromServer() {
+  try {
+    const res = await fetch('/api/cio/config');
+    if (!res.ok) return;
+    const cfg = await res.json();
+    const select = document.getElementById('radar-interval');
+    const engineEl = document.getElementById('scan-engine');
+    const autoinjectEl = document.getElementById('radar-autoinject');
+    if (select && cfg.interval_minutes !== undefined) {
+        select.value = String(cfg.interval_minutes);
+        toggleContinuousRadar(true);
+    }
+      if (autoinjectEl && cfg.auto_inject !== undefined) {
+        autoinjectEl.checked = Boolean(cfg.auto_inject);
+      }
+  } catch (err) {
+    console.warn("No se pudo cargar radar_config inicial:", err);
+  }
+}
+
 // Inicialización
 document.addEventListener('DOMContentLoaded', () => {
   fetchStatus();
+  loadRadarConfigFromServer();
   loadReportsList();
   loadLatestReport();
+  updateHeaderEngineStatus();
+
+  const engineEl = document.getElementById('scan-engine');
+  const autoinjectEl = document.getElementById('radar-autoinject');
+  if (engineEl) engineEl.addEventListener('change', () => {
+    updateHeaderEngineStatus();
+    saveBrainSelection(engineEl.value).catch(error => {
+      console.error('No se pudo guardar el cerebro central:', error);
+      alert(`No se pudo sincronizar el cerebro con Trading Ollama: ${error.message}`);
+    });
+  });
+  if (autoinjectEl) autoinjectEl.addEventListener('change', () => syncRadarConfigToServer());
+  startBrainSyncPolling();
 });

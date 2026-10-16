@@ -1,5 +1,7 @@
 from datetime import datetime
+import os
 import re
+from pathlib import Path
 from typing import Dict, List, Optional, Any
 import logging
 
@@ -25,6 +27,17 @@ from src.intelligence.prompts import (
 )
 
 logger = logging.getLogger(__name__)
+SHARED_DIRECTIVES_PATH = Path(os.environ.get(
+    "TRADING_OLLAMA_PROJECT_DIR",
+    Path(__file__).resolve().parents[3] / "trading_ollama",
+)) / "guias" / "directivas_cerebro.md"
+
+
+def _load_shared_directives() -> str:
+    try:
+        return SHARED_DIRECTIVES_PATH.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise RuntimeError("No se pudieron leer las directivas canónicas compartidas.") from exc
 
 
 class ContrarianEvaluator:
@@ -38,8 +51,8 @@ class ContrarianEvaluator:
 
     STEP_TIMEOUT = float(getattr(settings, "ollama_timeout", 120.0))
 
-    def __init__(self, use_gemini: bool = False):
-        self.ollama = OllamaClient()
+    def __init__(self, use_gemini: bool = False, model: Optional[str] = None):
+        self.ollama = OllamaClient(model=model)
         self.gemini = GeminiClient()
         self.use_gemini = use_gemini
 
@@ -52,11 +65,12 @@ class ContrarianEvaluator:
     ) -> Dict[str, Any]:
         """Ejecuta una llamada protegida por tiempo y tokens."""
         call_timeout = timeout or self.STEP_TIMEOUT
+        shared_system_prompt = f"{_load_shared_directives()}\n\nDIRECTIVA ESPECÍFICA DEL MONITOR:\n{system_prompt}"
 
         if self.use_gemini:
             if self.gemini.is_available():
                 try:
-                    return self.gemini.generate_json(system_prompt, user_prompt)
+                    return self.gemini.generate_json(shared_system_prompt, user_prompt)
                 except Exception as e:
                     logger.warning(
                         "Gemini falló (%s); se intentará Ollama local.",
@@ -71,7 +85,7 @@ class ContrarianEvaluator:
             raise RuntimeError(f"Ollama no disponible en {self.ollama.host}")
 
         return self.ollama.generate_json(
-            system_prompt=system_prompt,
+            system_prompt=shared_system_prompt,
             user_prompt=user_prompt,
             max_tokens=max_tokens,
             timeout=call_timeout,
