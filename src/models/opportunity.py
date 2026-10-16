@@ -151,6 +151,10 @@ class AnalysisBatch(BaseModel):
         default=None,
         description="Plan de acción paso a paso para el operador novato"
     )
+    motor_evaluador: str = Field(
+        default="Ollama Local",
+        description="Motor de inteligencia: Ollama Local o Antigravity CIO"
+    )
 
 
 

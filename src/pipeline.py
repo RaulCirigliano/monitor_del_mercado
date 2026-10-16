@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from rich.console import Console
 
 from src.ingestion import RSSCollector, MarketDataFetcher
@@ -49,6 +49,41 @@ class MarketMonitorPipeline:
                 seen.add(ticker)
                 ordered.append(ticker)
         return ordered[:limit]
+
+    def collect_candidates(
+        self,
+        category_filter: Optional[str] = None,
+        custom_directive: Optional[str] = None,
+        limit_tickers: int = 15,
+    ) -> Dict[str, Any]:
+        """Recolecta noticias e indicadores cuantitativos sin invocar el LLM.
+        Permite a agentes de razonamiento superior (ej. Antigravity CIO) auditar candidatos."""
+        from src.ingestion.market_schedule import MarketSchedule
+
+        news_items = self.collector.collect_all(
+            category_filter=category_filter,
+            custom_query=custom_directive,
+        )
+
+        detected_tickers = self._ordered_tickers(news_items, limit=limit_tickers)
+
+        snapshots: Dict[str, Any] = {}
+        for t in detected_tickers:
+            snap = self.market_fetcher.get_snapshot(t)
+            if snap:
+                snap_dict = snap.model_dump()
+                snap_dict["schedule"] = MarketSchedule.check_status(t)
+                snapshots[t] = snap_dict
+
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "category_filter": category_filter,
+            "custom_directive": custom_directive,
+            "news_count": len(news_items),
+            "news": [item.model_dump() for item in news_items],
+            "tickers": detected_tickers,
+            "snapshots": snapshots,
+        }
 
     def run(
         self,

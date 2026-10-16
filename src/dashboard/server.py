@@ -2,7 +2,7 @@ import json
 import logging
 import mimetypes
 import webbrowser
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs, urlsplit
 
@@ -129,6 +129,12 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 rel_path = str(r.relative_to(settings.reports_dir))
                 date_folder = r.parent.name if r.parent != settings.reports_dir else "General"
 
+                try:
+                    head = r.open(encoding="utf-8").read(400)
+                    motor = "Antigravity CIO" if "Antigravity CIO" in head else "Ollama Local"
+                except Exception:
+                    motor = "Ollama Local"
+
                 payload.append({
                     "name": r.name,
                     "rel_path": rel_path,
@@ -137,6 +143,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     "modo": modo,
                     "es_vigente": is_vigente,
                     "horas_antiguedad": round(hours_old, 1),
+                    "motor_evaluador": motor,
                 })
             self._set_headers(200)
             self.wfile.write(json.dumps(payload).encode("utf-8"))
@@ -211,6 +218,30 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(configs, default=str).encode("utf-8"))
             return
 
+        elif path == "/api/cio/candidates":
+            category = query.get("category", [None])[0]
+            custom_directive = query.get("directive", query.get("custom_directive", [None]))[0]
+            limit_str = query.get("limit", ["15"])[0]
+            try:
+                limit = min(max(int(limit_str), 1), 50)
+            except ValueError:
+                limit = 15
+
+            try:
+                pipeline = MarketMonitorPipeline()
+                candidates = pipeline.collect_candidates(
+                    category_filter=category or None,
+                    custom_directive=custom_directive or None,
+                    limit_tickers=limit,
+                )
+                self._set_headers(200)
+                self.wfile.write(json.dumps(candidates, default=str).encode("utf-8"))
+            except Exception as e:
+                logger.error("Error recopilando candidatos CIO: %s", e)
+                self._set_headers(500)
+                self.wfile.write(json.dumps({"error": f"Error recopilando candidatos: {e}"}).encode("utf-8"))
+            return
+
         # 2. Servir frontend estático (HTML, JS, CSS)
         if path == "/" or path == "/index.html":
             file_path = WEB_DIR / "index.html"
@@ -227,32 +258,15 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self._set_headers(404, "text/plain")
             self.wfile.write(b"404 Not Found")
 
-    def _handle_inject_to_trading_bot(self, data: dict | None = None):
-        """Reenvía una directiva macro/contrarian a trading_ollama adjuntando X-API-Token si está configurado."""
+    @staticmethod
+    def _send_macro_injection(data: dict) -> tuple[int, dict]:
+        """Envía una directiva a trading_ollama adjuntando X-API-Token si está configurado.
+        Retorna (status_code, response_data)."""
         import os
         import uuid
         from datetime import datetime, timezone
         import urllib.request
         import urllib.error
-
-        if data is None:
-            try:
-                data = self._read_json_body()
-            except ValueError as e:
-                self._set_headers(400)
-                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
-                return
-
-        if (
-            not isinstance(data.get("asset"), str)
-            or not isinstance(data.get("text"), str)
-            or not isinstance(data.get("type"), str)
-        ):
-            self._set_headers(400)
-            self.wfile.write(
-                '{"error":"La inyección requiere asset, text y type de texto"}'.encode("utf-8")
-            )
-            return
 
         payload = dict(data)
         payload.setdefault("id", str(uuid.uuid4()))
@@ -281,32 +295,122 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         try:
             with urllib.request.urlopen(req, timeout=4) as response:
                 res_body = response.read().decode("utf-8")
-                self._set_headers(response.status)
-                self.wfile.write(res_body.encode("utf-8"))
+                try:
+                    res_json = json.loads(res_body)
+                except Exception:
+                    res_json = {"raw": res_body}
+                return response.status, res_json
         except urllib.error.HTTPError as e:
             logger.warning("Trading Ollama respondió HTTP %s.", e.code)
-            self._set_headers(502)
-            self.wfile.write(
-                json.dumps(
-                    {"error": f"Trading Ollama rechazó la solicitud (HTTP {e.code})."}
-                ).encode("utf-8")
-            )
+            return 502, {"error": f"Trading Ollama rechazó la solicitud (HTTP {e.code})."}
         except urllib.error.URLError as e:
             logger.warning("No se pudo contactar Trading Ollama (%s).", type(e).__name__)
-            self._set_headers(502)
-            err_msg = (
-                "No se pudo conectar con Trading Ollama en http://127.0.0.1:18767. "
+            return 502, {
+                "error": "No se pudo conectar con Trading Ollama en http://127.0.0.1:18767. "
                 "Verifica que el bot de trading esté iniciado y escuchando en el puerto 18767."
-            )
-            self.wfile.write(json.dumps({"error": err_msg}).encode("utf-8"))
+            }
         except Exception as e:
             logger.error("Falló la solicitud a Trading Ollama (%s).", type(e).__name__)
-            self._set_headers(500)
+            return 500, {"error": "Falló la solicitud al servicio local de Trading Ollama."}
+
+    def _handle_inject_to_trading_bot(self, data: dict | None = None):
+        """Reenvía una directiva macro/contrarian a trading_ollama adjuntando X-API-Token si está configurado."""
+        if data is None:
+            try:
+                data = self._read_json_body()
+            except ValueError as e:
+                self._set_headers(400)
+                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+                return
+
+        if (
+            not isinstance(data.get("asset"), str)
+            or not isinstance(data.get("text"), str)
+            or not isinstance(data.get("type"), str)
+        ):
+            self._set_headers(400)
             self.wfile.write(
-                json.dumps(
-                    {"error": "Falló la solicitud al servicio local de Trading Ollama."}
-                ).encode("utf-8")
+                '{"error":"La inyección requiere asset, text y type de texto"}'.encode("utf-8")
             )
+            return
+
+        status_code, res_data = self._send_macro_injection(data)
+        self._set_headers(status_code)
+        self.wfile.write(json.dumps(res_data).encode("utf-8"))
+
+    def _handle_cio_publish(self):
+        """Publica un informe estratégico analizado por Antigravity CIO."""
+        try:
+            data = self._read_json_body()
+        except ValueError as e:
+            self._set_headers(400)
+            self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+            return
+
+        from datetime import datetime
+        from src.models import AnalysisBatch
+        from src.reporting import MarkdownReportGenerator
+
+        data.setdefault("timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        data.setdefault("motor_evaluador", "Antigravity CIO")
+        data.setdefault(
+            "total_noticias_analizadas",
+            len(data.get("oportunidades", [])) + len(data.get("alertas_peligro", []))
+        )
+        data.setdefault("total_ruido_descartado", 0)
+        data.setdefault(
+            "modo_escaneo",
+            "BUSQUEDA_ESPECIFICA" if data.get("directiva_personalizada") else "RADAR_AUTONOMO"
+        )
+
+        auto_inject = bool(data.pop("auto_inject", False))
+        inject_payload = data.pop("inject_payload", None)
+
+        try:
+            batch = AnalysisBatch(**data)
+        except Exception as e:
+            self._set_headers(400)
+            self.wfile.write(json.dumps({"error": f"Esquema de reporte inválido: {e}"}).encode("utf-8"))
+            return
+
+        try:
+            generator = MarkdownReportGenerator()
+            report_path = generator.generate_report(batch)
+        except Exception as e:
+            logger.error("Error generando reporte CIO: %s", e)
+            self._set_headers(500)
+            self.wfile.write(json.dumps({"error": f"Error guardando reporte: {e}"}).encode("utf-8"))
+            return
+
+        injection_result = None
+        if auto_inject or inject_payload:
+            target_injection = inject_payload
+            if not target_injection and batch.oportunidades:
+                top_op = batch.oportunidades[0]
+                target_injection = {
+                    "asset": top_op.ticker,
+                    "text": f"[RSI: {top_op.rsi_14 or 'N/D'} | Z-Score: {top_op.z_score_20 or 'N/D'}] Tesis CIO: {top_op.tesis_contrarian}",
+                    "confidence": int(top_op.score_asimetria * 10),
+                    "type": "Oportunidad",
+                    "source": "Antigravity CIO",
+                }
+            if target_injection:
+                target_injection.setdefault("source", "Antigravity CIO")
+                status_code, res_data = self._send_macro_injection(target_injection)
+                injection_result = {"status_code": status_code, "response": res_data}
+
+        rel_path = str(report_path.relative_to(settings.reports_dir))
+        self._set_headers(200)
+        self.wfile.write(
+            json.dumps({
+                "success": True,
+                "report_name": report_path.name,
+                "rel_path": rel_path,
+                "report_path": str(report_path),
+                "batch": batch.model_dump(),
+                "injection": injection_result,
+            }).encode("utf-8")
+        )
 
     def do_POST(self):
         if self._reject_non_local_request():
@@ -356,6 +460,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
         elif parsed.path == "/api/inject_to_trading_bot":
             self._handle_inject_to_trading_bot()
+        elif parsed.path == "/api/cio/publish":
+            self._handle_cio_publish()
         else:
             self._set_headers(404)
             self.wfile.write(b'{"error": "Ruta no encontrada"}')
@@ -424,7 +530,7 @@ def find_free_port(start_port: int = 8520, max_attempts: int = 20) -> int:
 def start_dashboard_server(port: int = 8520):
     """Inicia el servidor web local con auto-resolución de conflictos de puertos."""
     active_port = find_free_port(port)
-    server = HTTPServer(("127.0.0.1", active_port), DashboardRequestHandler)
+    server = ThreadingHTTPServer(("127.0.0.1", active_port), DashboardRequestHandler)
     dashboard_url = f"http://localhost:{active_port}"
     print(f"\n🚀 Dashboard de Monitor del Mercado activo en: {dashboard_url}")
     try:

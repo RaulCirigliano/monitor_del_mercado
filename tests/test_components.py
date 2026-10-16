@@ -848,3 +848,203 @@ def test_inject_endpoint_sends_x_api_token_header(monkeypatch):
         server.server_close()
         thread.join(timeout=2)
 
+
+def test_pipeline_collect_candidates(monkeypatch):
+    from src.pipeline import MarketMonitorPipeline
+    from src.models import NewsItem, AssetSnapshot
+
+    pipeline = MarketMonitorPipeline()
+
+    fake_news = [
+        NewsItem(
+            id="hash-1",
+            title="Capitulación en Bonos del Tesoro",
+            link="https://example.com/tlt",
+            source="Yahoo Finance",
+            category="macro_and_markets",
+            tickers_detected=["TLT"],
+        )
+    ]
+    monkeypatch.setattr(pipeline.collector, "collect_all", lambda **kw: fake_news)
+    fake_snap = AssetSnapshot(
+        ticker="TLT",
+        current_price=88.50,
+        currency="USD",
+        change_pct_24h=-1.5,
+        rsi_14=27.5,
+        z_score_20=-2.3,
+        ema_200=92.0,
+        atr_14=1.2,
+        atr_pct=1.35,
+        rvol_20=1.6,
+    )
+    monkeypatch.setattr(pipeline.market_fetcher, "get_snapshot", lambda ticker: fake_snap if ticker == "TLT" else None)
+
+    candidates = pipeline.collect_candidates(category_filter="macro_and_markets", custom_directive="bonos", limit_tickers=5)
+
+    assert candidates["news_count"] == 1
+    assert "TLT" in candidates["tickers"]
+    assert "TLT" in candidates["snapshots"]
+    snap_tlt = candidates["snapshots"]["TLT"]
+    assert snap_tlt["rsi_14"] == 27.5
+    assert snap_tlt["z_score_20"] == -2.3
+    assert "schedule" in snap_tlt
+
+
+def test_cio_candidates_endpoint(monkeypatch):
+    from http.server import HTTPServer
+    from threading import Thread
+    import httpx
+    from src.dashboard.server import DashboardRequestHandler
+    from src.pipeline import MarketMonitorPipeline
+
+    fake_candidates = {
+        "timestamp": "2026-10-15T20:00:00",
+        "news_count": 2,
+        "tickers": ["TLT", "CL=F"],
+        "snapshots": {"TLT": {"current_price": 88.5, "rsi_14": 26.0}},
+    }
+    monkeypatch.setattr(MarketMonitorPipeline, "collect_candidates", lambda self, **kw: fake_candidates)
+
+    server = HTTPServer(("127.0.0.1", 0), DashboardRequestHandler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base_url = f"http://127.0.0.1:{server.server_port}"
+        with httpx.Client() as client:
+            res = client.get(
+                f"{base_url}/api/cio/candidates?category=macro_and_markets",
+                headers={"Host": f"127.0.0.1:{server.server_port}"},
+            )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["news_count"] == 2
+        assert "TLT" in data["tickers"]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_cio_publish_endpoint_and_auto_inject(monkeypatch, tmp_path):
+    import json
+    from http.server import HTTPServer
+    from threading import Thread
+    import httpx
+    import urllib.request
+    from config import settings
+    from src.dashboard.server import DashboardRequestHandler
+
+    monkeypatch.setattr(settings, "reports_dir", tmp_path)
+
+    captured_injections = []
+
+    class DummyResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def read(self):
+            return b'{"status":"ok","injected":true}'
+
+    def fake_urlopen(req, timeout=4):
+        captured_injections.append(req)
+        return DummyResponse()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    server = HTTPServer(("127.0.0.1", 0), DashboardRequestHandler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base_url = f"http://127.0.0.1:{server.server_port}"
+        payload = {
+            "motor_evaluador": "Antigravity CIO",
+            "sintesis_ejecutiva": "Tesis institucional CIO sobre TLT",
+            "conclusiones_internas": ["Sobreventa extrema", "Asimetría 1:3.5"],
+            "oportunidades": [
+                {
+                    "ticker": "TLT",
+                    "asset_name": "iShares 20+ Year Treasury Bond ETF",
+                    "tipo": "Oportunidad Asimétrica",
+                    "sentimiento_mercado": "Pánico Extremo / Capitulación",
+                    "tesis_contrarian": "Capitulación en bonos soberanos",
+                    "catalizador_detonante": "Subastas absorbidas",
+                    "soporte_secular": "Refugio macro en desaceleración",
+                    "ratio_riesgo_beneficio": 3.5,
+                    "nivel_entrada_sugerido": "88.00 - 88.50 USD",
+                    "stop_loss_sugerido": "85.00 USD",
+                    "target_proyectado": "99.00 USD",
+                    "horizonte_temporal": "3-6 meses",
+                    "score_asimetria": 9,
+                    "rsi_14": 25.5,
+                    "z_score_20": -2.4,
+                }
+            ],
+            "alertas_peligro": [],
+            "auto_inject": True,
+        }
+        with httpx.Client() as client:
+            res = client.post(
+                f"{base_url}/api/cio/publish",
+                json=payload,
+                headers={"Host": f"127.0.0.1:{server.server_port}"},
+            )
+        assert res.status_code == 200
+        res_data = res.json()
+        assert res_data["success"] is True
+        assert "report_path" in res_data
+        assert res_data["injection"] is not None
+        assert res_data["injection"]["status_code"] == 200
+
+        # Verificar reporte generado en disco
+        saved_file = Path(res_data["report_path"])
+        assert saved_file.exists()
+        content = saved_file.read_text(encoding="utf-8")
+        assert "Antigravity CIO" in content
+        assert "TLT" in content
+
+        # Verificar payload de inyección enviado
+        assert len(captured_injections) == 1
+        req_sent = captured_injections[0]
+        sent_body = json.loads(req_sent.data.decode("utf-8"))
+        assert sent_body["asset"] == "TLT"
+        assert sent_body["source"] == "Antigravity CIO"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_report_parser_motor_evaluador(tmp_path):
+    from src.dashboard.report_parser import parse_markdown_report
+
+    cio_md = tmp_path / "RADAR_CIO_test.md"
+    cio_md.write_text(
+        "# 🦅 Monitor del Mercado — Reporte de Inteligencia Contrarian\n"
+        "**Modo de Escaneo:** `🛰️ RADAR AUTÓNOMO`  \n"
+        "**Motor Evaluador:** `Antigravity CIO`  \n"
+        "**Fecha de Emisión:** 2026-10-15 22:00:00  \n"
+        "> **Veredicto Ejecutivo:** Análisis CIO.\n",
+        encoding="utf-8",
+    )
+    parsed = parse_markdown_report(cio_md)
+    assert parsed["motor_evaluador"] == "Antigravity CIO"
+
+    ollama_md = tmp_path / "RADAR_ollama_test.md"
+    ollama_md.write_text(
+        "# 🦅 Monitor del Mercado — Reporte de Inteligencia Contrarian\n"
+        "**Modo de Escaneo:** `🛰️ RADAR AUTÓNOMO`  \n"
+        "**Motor Evaluador:** `Ollama Local`  \n"
+        "**Fecha de Emisión:** 2026-10-15 22:00:00  \n"
+        "> **Veredicto Ejecutivo:** Análisis Ollama.\n",
+        encoding="utf-8",
+    )
+    parsed_ollama = parse_markdown_report(ollama_md)
+    assert parsed_ollama["motor_evaluador"] == "Ollama Local"
+
+

@@ -79,7 +79,8 @@ function renderReportsListButtons() {
     const isVigenteDot = r.es_vigente
       ? '<span class="w-2 h-2 rounded-full bg-emerald-400 inline-block shadow-[0_0_6px_rgba(52,211,153,0.8)]"></span>'
       : '<span class="w-2 h-2 rounded-full bg-slate-600 inline-block"></span>';
-    const modeIcon = r.modo === 'BUSQUEDA_ESPECIFICA' ? '🎯' : '🛰️';
+    const isCIO = r.motor_evaluador === 'Antigravity CIO' || (r.name && r.name.includes('CIO'));
+    const modeIcon = isCIO ? '🏛️' : (r.modo === 'BUSQUEDA_ESPECIFICA' ? '🎯' : '🛰️');
     const folderLabel = r.date_folder && r.date_folder !== 'General' ? `[${r.date_folder}] ` : '';
     const ageLabel = r.horas_antiguedad !== undefined ? ` (${r.horas_antiguedad}h)` : '';
 
@@ -185,6 +186,18 @@ function updateReportBanner(reportData) {
       modeBadge.innerText = reportData.modo_escaneo === 'BUSQUEDA_ESPECIFICA'
         ? '🎯 Búsqueda Específica'
         : '🛰️ Radar Autónomo';
+    }
+
+    const engineBadge = document.getElementById('report-engine-badge');
+    if (engineBadge) {
+      const isCIO = reportData.motor_evaluador === 'Antigravity CIO' || (reportData.name && reportData.name.includes('CIO'));
+      if (isCIO) {
+        engineBadge.className = 'px-2 py-0.5 rounded text-[11px] font-bold bg-purple-950 text-purple-300 border border-purple-800';
+        engineBadge.innerText = '🏛️ Antigravity CIO';
+      } else {
+        engineBadge.className = 'px-2 py-0.5 rounded text-[11px] font-bold bg-blue-950 text-blue-300 border border-blue-800';
+        engineBadge.innerText = '🤖 Ollama Local';
+      }
     }
 
     if (folderBadge) {
@@ -569,15 +582,44 @@ async function triggerScan(isAutomatic = false) {
   const spinner = document.getElementById('scan-spinner');
   const btnText = document.getElementById('scan-btn-text');
   const category = document.getElementById('scan-category').value;
-  const customDirective = document.getElementById('scan-custom-directive')
-    ? document.getElementById('scan-custom-directive').value.trim()
-    : '';
+  const engineEl = document.getElementById('scan-engine');
+  const engine = engineEl ? engineEl.value : 'ollama';
 
   btn.disabled = true;
   spinner.classList.remove('hidden');
-  btnText.innerText = isAutomatic ? "Radar continuo escaneando..." : "Escaneando mercado e IA...";
+  btnText.innerText = engine === 'antigravity_cio'
+    ? (isAutomatic ? "Radar CIO recopilando..." : "Recopilando candidatos para CIO...")
+    : (isAutomatic ? "Radar continuo escaneando..." : "Escaneando mercado e IA...");
 
   try {
+    if (engine === 'antigravity_cio') {
+      const params = new URLSearchParams();
+      if (category) params.append('category', category);
+      if (customDirective) params.append('directive', customDirective);
+
+      const res = await fetch(`/api/cio/candidates?${params.toString()}`);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Error HTTP ${res.status}`);
+      }
+      const candidates = await res.json();
+      const tickersStr = candidates.tickers && candidates.tickers.length > 0
+        ? candidates.tickers.join(', ')
+        : 'Ninguno';
+
+      if (!isAutomatic) {
+        const msg = `🏛️ ¡Candidatos recopilados con éxito para Antigravity CIO!\n\n` +
+          `• Eventos ingestados: ${candidates.news_count}\n` +
+          `• Activos identificados: ${candidates.tickers ? candidates.tickers.length : 0} (${tickersStr})\n\n` +
+          `El agente Antigravity CIO puede evaluar estos datos con las Tres Verdades Contraintuitivas y publicar el informe oficial vía POST /api/cio/publish.\n\n` +
+          `💡 Pídele a Antigravity en el chat:\n"Ejecuta la auditoría CIO del Monitor del Mercado con los candidatos recolectados"`;
+        alert(msg);
+      } else {
+        console.log("Radar CIO: candidatos recopilados para Antigravity CIO.", candidates);
+      }
+      return;
+    }
+
     const res = await fetch('/api/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -615,7 +657,7 @@ async function triggerScan(isAutomatic = false) {
   } finally {
     btn.disabled = false;
     spinner.classList.add('hidden');
-    btnText.innerText = "🚀 Escanear Mercado Ahora";
+    btnText.innerText = "Iniciar escaneo";
   }
 }
 

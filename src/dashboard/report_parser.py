@@ -85,12 +85,20 @@ def parse_markdown_report(report_path: Path) -> Dict[str, Any]:
         "oportunidades": [],
         "alertas_peligro": [],
         "directiva_personalizada": None,
+        "motor_evaluador": "Ollama Local",
     }
 
     # Extraer timestamp
     m_time = re.search(r"\*\*(?:Fecha de Emisión|Generado):\*\*\s*(.+)", text)
     if m_time:
         result["timestamp"] = m_time.group(1).strip()
+
+    # Extraer motor evaluador si existe
+    m_motor = re.search(r"\*\*Motor Evaluador:\*\*\s*`([^`]+)`", text)
+    if m_motor:
+        result["motor_evaluador"] = m_motor.group(1).strip()
+    elif "Antigravity CIO" in text[:300]:
+        result["motor_evaluador"] = "Antigravity CIO"
 
     # Extraer modo explícito si está en el texto
     m_modo = re.search(r"\*\*Modo de Escaneo:\*\*\s*`([^`]+)`", text)

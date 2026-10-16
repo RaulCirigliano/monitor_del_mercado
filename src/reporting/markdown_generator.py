@@ -86,6 +86,7 @@ class MarkdownReportGenerator:
 
         md_content = f"""# 🦅 Monitor del Mercado — Reporte de Inteligencia Contrarian
 **Modo de Escaneo:** `{modo_label}`  
+**Motor Evaluador:** `{batch.motor_evaluador}`  
 **Fecha de Emisión:** {batch.timestamp}  
 **Vigencia Táctica:** 🟢 VIGENTE (Validez estimada: {batch.horas_vigencia} horas)  
 {directive_line}**Misión:** Detección de oportunidades de alta asimetría matemática ($R/B \\ge 1:3$) y capitulaciones de mercado.

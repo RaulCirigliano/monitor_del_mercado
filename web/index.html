@@ -60,6 +60,11 @@
           <option value="global_tech_and_china">Global, IA & China Tech</option>
           <option value="crypto_and_alternatives">Criptoactivos</option>
         </select>
+        <label class="field-label" for="scan-engine">Motor de inteligencia contrarian</label>
+        <select id="scan-engine">
+          <option value="ollama" selected>🤖 Ollama Local (qwen2.5:3b · VRAM)</option>
+          <option value="antigravity_cio">🏛️ Antigravity CIO (Razonamiento Superior · Zero-RAM)</option>
+        </select>
         <button id="btn-scan" onclick="triggerScan()" class="primary-button">
           <span id="scan-spinner" class="hidden">◌</span>
           <span id="scan-btn-text">Iniciar escaneo</span>
@@ -143,6 +148,7 @@
             <span class="muted">ACTIVO</span><strong id="report-active-title"></strong>
             <span id="report-vigencia-badge" class="badge"></span>
             <span id="report-mode-badge" class="badge neutral-badge"></span>
+            <span id="report-engine-badge" class="badge neutral-badge"></span>
             <span id="report-folder-badge" class="muted"></span>
             <span id="report-age-text" class="muted"></span>
           </div>
